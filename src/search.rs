@@ -160,6 +160,12 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         beta: Eval,
         in_zw: bool,
     ) -> (ChessMove, Eval, NodeType) {
+        if depth == 0 {
+            return (ChessMove::default(), self.quiescence_search(game, alpha, beta), NodeType::None);
+        }
+
+        let in_check = game.board().checkers().0 != 0;
+
         if game.can_declare_draw() {
             return (ChessMove::default(), Eval(0), NodeType::None);
         }
@@ -175,6 +181,17 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                     return (trans.next, eval, NodeType::None);
                 }
             }
+
+            // reversed futility pruning
+            if depth != 0 && !in_check && depth <= 1 {
+                let eval = evaluate_static(game.board());
+                let margin = 150 * depth as i16;
+
+                if eval.0 >= beta.0.saturating_add(margin) {
+                    // return (ChessMove::default(), Eval(((eval.0 as i32 + beta.0 as i32) / 2) as i16), NodeType::None);
+                    return (ChessMove::default(), eval, NodeType::None);
+                }
+            }
         }
 
         match game.board().status() {
@@ -185,10 +202,6 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
         if self.abort() {
             return (ChessMove::default(), Eval(0), NodeType::None);
-        }
-
-        if depth == 0 {
-            return (ChessMove::default(), self.quiescence_search(game, alpha, beta), NodeType::None);
         }
 
         let killer = KillerTable::new();
@@ -202,8 +215,6 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 return (low.0, low.1, NodeType::None);
             }
         }
-
-        let in_check = game.board().checkers().0 != 0;
 
         // null move pruning
         if ply != 0 && !in_check && depth > 3 && !Node::PV && (
@@ -237,20 +248,6 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         let _game = &game;
         for (i, (m, _)) in moves.iter().copied().enumerate() {
             let game = _game.make_move(m);
-
-            // futility pruning: kill nodes with no potential
-            if !in_check && depth <= 2 {
-                let eval = -evaluate_static(game.board());
-                let margin = 100 * depth as i16 * depth as i16;
-
-                if eval.0 + margin < alpha.0 {
-                    if best.0 == ChessMove::default() {
-                        best = (m, eval - margin);
-                    }
-
-                    continue;
-                }
-            }
 
             let can_reduce = depth >= 3 && !in_check && children_searched != 0;
 
