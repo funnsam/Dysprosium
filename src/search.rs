@@ -175,6 +175,15 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                     return (trans.next, eval, NodeType::None);
                 }
             }
+
+            if depth <= 1 {
+                let eval = evaluate_static(game.board());
+                let margin = 150 * depth as i16;
+
+                if eval.0 >= beta.0.saturating_add(margin) {
+                    return (ChessMove::default(), eval, NodeType::None);
+                }
+            }
         }
 
         match game.board().status() {
@@ -237,20 +246,6 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         let _game = &game;
         for (i, (m, _)) in moves.iter().copied().enumerate() {
             let game = _game.make_move(m);
-
-            // futility pruning: kill nodes with no potential
-            if !in_check && depth <= 2 {
-                let eval = -evaluate_static(game.board());
-                let margin = 100 * depth as i16 * depth as i16;
-
-                if eval.0 + margin < alpha.0 {
-                    if best.0 == ChessMove::default() {
-                        best = (m, eval - margin);
-                    }
-
-                    continue;
-                }
-            }
 
             let can_reduce = depth >= 3 && !in_check && children_searched != 0;
 
