@@ -1,6 +1,6 @@
 #![feature(str_split_whitespace_remainder)]
 
-use std::{io::BufRead, str::FromStr};
+use std::io::BufRead;
 use dysprosium::*;
 
 mod client;
