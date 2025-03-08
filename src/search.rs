@@ -166,6 +166,20 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             return (ChessMove::default(), Eval(0), NodeType::None);
         }
 
+        match game.board().status() {
+            BoardStatus::Ongoing => {},
+            BoardStatus::Checkmate => return (ChessMove::default(), -Eval::M0, NodeType::None),
+            BoardStatus::Stalemate => return (ChessMove::default(), Eval(0), NodeType::None),
+        }
+
+        if self.abort() {
+            return (ChessMove::default(), Eval(0), NodeType::None);
+        }
+
+        if depth == 0 {
+            return (ChessMove::default(), self.quiescence_search(game, alpha, beta), NodeType::None);
+        }
+
         if !Node::PV {
             if let Some(trans) = self.trans_table.get(game.board().get_hash()) {
                 let eval = trans.eval;
@@ -179,7 +193,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             }
 
             // reversed futility pruning
-            if depth != 0 && !in_check && depth <= 1 {
+            if !in_check && depth <= 1 {
                 let eval = evaluate_static(game.board());
                 let margin = 150 * depth as i16;
 
@@ -188,20 +202,6 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                     return (ChessMove::default(), eval, NodeType::None);
                 }
             }
-        }
-
-        match game.board().status() {
-            BoardStatus::Ongoing => {},
-            BoardStatus::Checkmate => return (ChessMove::default(), -Eval::M0, NodeType::None),
-            BoardStatus::Stalemate => return (ChessMove::default(), Eval(0), NodeType::None),
-        }
-
-        if self.abort() {
-            return (ChessMove::default(), Eval(0), NodeType::None);
-        }
-
-        if depth == 0 {
-            return (ChessMove::default(), self.quiescence_search(game, alpha, beta), NodeType::None);
         }
 
         let killer = KillerTable::new();
