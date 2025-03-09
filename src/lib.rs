@@ -182,6 +182,10 @@ impl Engine {
     pub fn clear_hash(&mut self) {
         self.trans_table.clear();
     }
+
+    pub fn dump_debug(&self) {
+        println!("{:#?}", self.debug);
+    }
 }
 
 impl Drop for Engine {

@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::*;
 
 use dysprosium::Engine;
@@ -70,14 +72,15 @@ impl State {
                 } else if let Some(tc) = tc {
                     self.engine.time_control(movestogo, tc);
                 } else {
-                    self.engine.allow_for(std::time::Duration::MAX);
+                    self.engine.allow_for(Duration::MAX);
                 }
 
                 let mov = self.best_move(target_depth);
                 if self.debug_mode {
-                    // NOTE: getting the amount of tt used can be expensive, so it is only counted
-                    // if in debug mode
-                    println!("info hashfull {}", 1000 * self.engine.tt_used() / self.engine.tt_size());
+                    let full = 1000 * self.engine.tt_used() / self.engine.tt_size();
+
+                    println!("info hashfull {full}");
+                    self.engine.dump_debug();
                 }
                 println!("bestmove {mov}");
             },
@@ -87,44 +90,17 @@ impl State {
                 self.engine.game.read(),
                 evaluate_static(self.engine.game.read().board()),
             ),
-            Some(uci::UciCommand::Bench) => self.benchmark(),
+            Some(uci::UciCommand::Bench) => {
+                self.engine.allow_for(Duration::MAX);
+                self.engine.best_move(|_, (_, _, depth)| depth < 16);
+
+                let nodes = self.engine.nodes();
+                let elapsed = self.engine.elapsed();
+                let nps = (nodes as f64 / elapsed.as_secs_f64()).round();
+
+                println!("{nodes} nodes {nps} nps");
+            },
             None => {},
-        }
-    }
-
-    fn benchmark(&mut self) {
-        let mut results = [0; 8];
-
-        *self.engine.game.write() = Game::from_str("r5k1/5pp1/P1p1P2p/2R5/3r4/6PP/1P2R1K1/8 b - - 0 34").unwrap();
-
-        for (i, rec) in results.iter_mut().enumerate() {
-            const ITERS: usize = 4;
-
-            self.engine.kill_smp();
-            self.engine.start_smp(i);
-
-            let mut nodes = 0;
-            for _ in 0..ITERS {
-                self.engine.clear_hash();
-
-                self.engine.allow_for(std::time::Duration::from_secs(1));
-                self.engine.best_move(|_, (_, _, depth)| {
-                    println!("{}t {depth}", i + 1);
-                    true
-                });
-
-                nodes += self.engine.nodes();
-            }
-
-            *rec = nodes / ITERS;
-        }
-
-        println!("{results:?}");
-
-        let m = results[1] as f32 - results[0] as f32;
-
-        for (i, r) in results.into_iter().enumerate() {
-            println!("{}t: {r} nps (linear: {}, {} × 1t)", i + 1, m * i as f32 + results[0] as f32, r as f32 / results[0] as f32);
         }
     }
 
