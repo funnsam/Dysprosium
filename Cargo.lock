@@ -113,6 +113,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "chess"
+version = "4.0.0"
+source = "git+https://github.com/funnsam/chess.git#5aa36dc08b04deb709da943454133489f0a39109"
+dependencies = [
+ "arrayvec",
+ "const_for",
+ "nodrop",
+ "rand",
+ "thiserror",
+]
+
+[[package]]
 name = "ciborium"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -264,7 +276,7 @@ version = "0.1.0"
 dependencies = [
  "arrayvec",
  "bytemuck",
- "chess",
+ "chess 4.0.0 (git+https://github.com/funnsam/chess.git)",
  "fastrand",
  "fxhash",
  "parking_lot",
@@ -274,7 +286,7 @@ dependencies = [
 name = "dysprosium-lichess"
 version = "0.1.0"
 dependencies = [
- "chess",
+ "chess 4.0.0",
  "dysprosium",
  "serde",
  "serde_json",
@@ -285,7 +297,7 @@ dependencies = [
 name = "dysprosium-uci"
 version = "0.1.0"
 dependencies = [
- "chess",
+ "chess 4.0.0",
  "dysprosium",
 ]
 
