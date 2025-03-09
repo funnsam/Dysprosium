@@ -37,7 +37,6 @@ impl Engine {
         }
 
         self.smp_abort.initiate();
-        println!("{:#?}", self.debug);
         prev
     }
 }
