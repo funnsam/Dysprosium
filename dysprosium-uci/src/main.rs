@@ -1,6 +1,6 @@
 #![feature(str_split_whitespace_remainder)]
 
-use std::{io::BufRead, str::FromStr};
+use std::io::BufRead;
 use dysprosium::*;
 
 mod client;
@@ -15,8 +15,22 @@ fn main() {
 
     let mut client = client::State::new();
 
+    let mut args = std::env::args().skip(1);
+    if let Some(a) = args.next() {
+        let mut a = Some(a);
+
+        while let Some(l) = a {
+            let tokens = l.split_whitespace();
+            client.handle_command(uci::parse_command(tokens));
+
+            a = args.next();
+        }
+
+        std::process::exit(0);
+    }
+
     let stdin = std::io::stdin().lock().lines();
-    for l in std::env::args().skip(1).map(Ok).chain(stdin) {
+    for l in stdin {
         if let Ok(l) = l {
             let tokens = l.split_whitespace();
             client.handle_command(uci::parse_command(tokens));
