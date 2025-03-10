@@ -260,7 +260,12 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
             let mut eval = Eval(i16::MIN);
             let do_full_research = if can_reduce {
-                eval = -self.zw_search::<Node::Zw>(Some(&line), &game, &killer, depth / 2, ply + 1, -alpha);
+                let mut r = (depth + 1) / 2;
+                if !Node::PV && !line.is_improving() { r += 1 };
+
+                r = r.min(depth);
+
+                eval = -self.zw_search::<Node::Zw>(Some(&line), &game, &killer, depth - r, ply + 1, -alpha);
 
                 if alpha < eval && depth / 2 < depth - 1 {
                     self.debug.research.inc();
