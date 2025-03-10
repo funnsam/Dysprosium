@@ -216,14 +216,14 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         }
 
         // null move pruning
-        if ply != 0 && !in_check && depth > 3 && !Node::PV && (
+        if !Node::PV && !in_check && depth >= 4 && (
             game.board().pieces(Piece::Knight).0 != 0 ||
             game.board().pieces(Piece::Bishop).0 != 0 ||
             game.board().pieces(Piece::Rook).0 != 0 ||
             game.board().pieces(Piece::Queen).0 != 0
         ) {
             let game = game.make_null_move().unwrap();
-            let r = if depth > 7 && game.board().color_combined(game.board().side_to_move()).popcnt() >= 2 { 5 } else { 4 };
+            let r = 3 + depth / 3;
             let eval = -self.zw_search::<Cut>(prev_move, &game, &killer, depth - r, ply + 1, 1 - beta);
 
             if eval >= beta {
