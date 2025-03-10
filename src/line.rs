@@ -28,6 +28,12 @@ impl PrevMove<'_> {
 
         Some(at)
     }
+
+    pub fn is_improving(&self) -> bool {
+        self.n_plies_ago(2).map_or(true, |m| {
+            *m.static_eval < *self.static_eval
+        })
+    }
 }
 
 impl<'a> EvalCell<'a> {
