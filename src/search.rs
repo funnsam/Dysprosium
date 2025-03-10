@@ -194,7 +194,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             // reversed futility pruning
             if !in_check && depth <= 2 {
                 let eval = evaluate_static(game.board());
-                let margin = 80 * depth as i16;
+                let margin = 150 * depth as i16;
 
                 if eval.0 >= beta.0.saturating_add(margin) {
                     // return (ChessMove::default(), Eval(((eval.0 as i32 + beta.0 as i32) / 2) as i16), NodeType::None);
