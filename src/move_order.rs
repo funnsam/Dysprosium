@@ -1,5 +1,5 @@
 use core::cmp::*;
-use crate::{trans_table::TransTableEntry, Game};
+use crate::{line::PrevMove, trans_table::TransTableEntry, Game};
 use core::cell::UnsafeCell;
 use crate::eval::PIECE_VALUE;
 use chess::ChessMove;
@@ -67,11 +67,13 @@ impl<const MAIN: bool> crate::SmpThread<'_, MAIN> {
     pub(crate) fn move_score(
         &self,
         m: ChessMove,
-        prev_move: ChessMove,
+        prev_move: Option<&PrevMove>,
         game: &Game,
         tte: &Option<TransTableEntry>,
         killer: &KillerTable,
     ) -> i32 {
+        let prev_move = prev_move.map_or(ChessMove::default(), |m| m.mov);
+
         if tte.is_some_and(|tte| tte.next == m) {
             i32::MAX
         } else if game.is_capture(m) {

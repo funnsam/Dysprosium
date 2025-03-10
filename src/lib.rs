@@ -12,6 +12,7 @@ use parking_lot::{Condvar, Mutex, RwLock};
 mod debug;
 mod eval;
 pub mod game;
+mod line;
 mod move_order;
 mod node;
 mod search;
