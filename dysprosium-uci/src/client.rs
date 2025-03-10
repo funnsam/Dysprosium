@@ -7,14 +7,8 @@ use dysprosium::Engine;
 fn print_uci_info() {
     println!("id name dysprosium v{VERSION}");
     println!("id author funnsam");
-    println!(
-        "option name Hash type spin default {DEFAULT_HASH_SIZE_MB} min 1 max {}",
-        usize::MAX,
-    );
-    println!(
-        "option name Threads type spin default {DEFAULT_THREADS} min 1 max {}",
-        usize::MAX - 1,
-    );
+    println!("option name Hash type spin default {DEFAULT_HASH_SIZE_MB} min 1 max 16384");
+    println!("option name Threads type spin default {DEFAULT_THREADS} min 1 max 256");
 }
 
 pub struct State {
