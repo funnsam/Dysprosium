@@ -267,13 +267,13 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
                 eval = -self.zw_search::<Node::Zw>(Some(&line), &game, &killer, depth - r, ply + 1, -alpha);
 
-                if alpha < eval && depth / 2 < depth - 1 {
+                if alpha < eval && depth - r < depth - 1 {
                     self.debug.research.inc();
                 } else {
                     self.debug.no_research.inc();
                 }
 
-                alpha < eval && depth / 2 < depth - 1
+                alpha < eval && depth - r < depth - 1
             } else {
                 !Node::PV || children_searched != 0
             };
