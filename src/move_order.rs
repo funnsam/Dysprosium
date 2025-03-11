@@ -67,19 +67,18 @@ impl<const MAIN: bool> crate::SmpThread<'_, MAIN> {
     pub(crate) fn move_score(
         &self,
         m: ChessMove,
-        prev_move: Option<&PrevMove>,
+        prev_move: &PrevMove,
         game: &Game,
         tte: &Option<TransTableEntry>,
         killer: &KillerTable,
     ) -> i32 {
-        let prev_move = prev_move.map_or(ChessMove::default(), |m| m.mov);
 
         if tte.is_some_and(|tte| tte.next == m) {
             i32::MAX
         } else if game.is_capture(m) {
             mvv_lva(game, m) as i32 * 327601
         } else {
-            if self.countermove[prev_move] == m {
+            if self.countermove[prev_move.mov] == m {
                 return 327600;
             }
 
