@@ -1,0 +1,4 @@
+allow-casual = true
+tc-blacklist = ["correspondence", "classical"]
+threads-per-game = 1
+max-games = 2
