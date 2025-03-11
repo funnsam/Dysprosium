@@ -1,6 +1,6 @@
 use core::sync::atomic::Ordering;
 
-use crate::{*, eval::*, trans_table::*};
+use crate::{eval::*, line::{EvalCell, PrevMove}, trans_table::*, *};
 use chess::{BoardStatus, ChessMove, MoveGen, Piece};
 use move_order::KillerTable;
 use node::{Cut, NodeType, Pv};
@@ -82,7 +82,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         self.nodes_searched = 0;
 
         let game: Game = self.game.read().clone();
-        let (next, eval, nt) = self._evaluate_search::<Pv, true>(ChessMove::default(), &game, &KillerTable::new(), depth, 0, alpha, beta, false);
+        let (next, eval, nt) = self._evaluate_search::<Pv, true>(None, &game, &KillerTable::new(), depth, 0, alpha, beta, false);
 
         self.store_tt(depth, &game, (next, eval, nt));
         self.total_nodes_searched.fetch_add(self.nodes_searched, Ordering::Relaxed);
@@ -101,7 +101,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
     #[inline]
     fn zw_search<Node: node::Node>(
         &mut self,
-        prev_move: ChessMove,
+        prev_move: Option<&PrevMove>,
         game: &Game,
         killer: &KillerTable,
         depth: usize,
@@ -115,7 +115,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
     #[inline]
     fn evaluate_search<Node: node::Node>(
         &mut self,
-        prev_move: ChessMove,
+        prev_move: Option<&PrevMove>,
         game: &Game,
         killer: &KillerTable,
         depth: usize,
@@ -150,7 +150,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
     fn _evaluate_search<Node: node::Node, const ROOT: bool>(
         &mut self,
-        prev_move: ChessMove,
+        prev_move: Option<&PrevMove>,
         game: &Game,
         p_killer: &KillerTable,
         depth: usize,
@@ -231,6 +231,13 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             }
         }
 
+        let f_margin = 200 * depth as i16;
+        let can_f_prune = !Node::PV
+            && depth <= 3
+            && !in_check
+            && !alpha.is_mate()
+            && *prev_move.eval + f_margin <= alpha;
+
         let tte = self.trans_table.get(game.board().get_hash());
 
         let mut moves = MoveGen::new_legal(game.board())
@@ -246,13 +253,22 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         let mut children_searched = 0;
         let _game = &game;
         for (i, (m, _)) in moves.iter().copied().enumerate() {
+            if can_f_prune && children_searched > 0 && _game.is_quiet(m) {
+                continue;
+            }
+
             let game = _game.make_move(m);
+            let line = PrevMove {
+                mov: m,
+                static_eval: EvalCell::new(game.board()),
+                prev_move,
+            };
 
             let can_reduce = depth >= 3 && !in_check && children_searched != 0;
 
             let mut eval = Eval(i16::MIN);
             let do_full_research = if can_reduce {
-                eval = -self.zw_search::<Node::Zw>(m, &game, &killer, depth / 2, ply + 1, -alpha);
+                eval = -self.zw_search::<Node::Zw>(Some(&line), &game, &killer, depth / 2, ply + 1, -alpha);
 
                 if alpha < eval && depth / 2 < depth - 1 {
                     self.debug.research.inc();
@@ -266,12 +282,12 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             };
 
             if do_full_research {
-                eval = -self.zw_search::<Node::Zw>(m, &game, &killer, depth - 1, ply + 1, -alpha);
+                eval = -self.zw_search::<Node::Zw>(Some(&line), &game, &killer, depth - 1, ply + 1, -alpha);
                 self.debug.all_full_zw.inc();
             }
 
             if Node::PV && (children_searched == 0 || alpha < eval) {
-                eval = -self.evaluate_search::<Pv>(m, &game, &killer, depth - 1, ply + 1, -beta, -alpha, in_zw);
+                eval = -self.evaluate_search::<Pv>(Some(&line), &game, &killer, depth - 1, ply + 1, -beta, -alpha, in_zw);
 
                 self.debug.all_full.inc();
                 if do_full_research {
@@ -303,7 +319,9 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
                     self.hist_table.update(m, bonus);
                     p_killer.update(m, bonus);
-                    *self.countermove.get_mut(prev_move) = m;
+
+                    let pm = prev_move.map_or(ChessMove::default(), |m| m.mov);
+                    *self.countermove.get_mut(pm) = m;
                 }
 
                 return (best.0, best.1.incr_mate(), NodeType::Cut);
