@@ -244,12 +244,12 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         }
 
         // check if futility pruning is applicable
-        // let f_margin = 150 * depth as i16;
-        // let can_f_prune = !Node::PV
-        //     && depth <= 2
-        //     && !in_check
-        //     && !alpha.is_mate()
-        //     && *prev_move.static_eval + f_margin <= alpha;
+        let f_margin = 150 * depth as i16;
+        let can_f_prune = !Node::PV
+            && depth <= 2
+            && !in_check
+            && !alpha.is_mate()
+            && *prev_move.static_eval + f_margin <= alpha;
 
         let tte = self.trans_table.get(game.board().get_hash());
 
@@ -267,9 +267,9 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         let _game = &game;
         for (i, (m, _)) in moves.iter().copied().enumerate() {
             // apply futility pruning if we could and if this move is quiet
-            // if can_f_prune && children_searched > 0 && _game.is_quiet(m) {
-            //     continue;
-            // }
+            if can_f_prune && children_searched > 0 && _game.is_quiet(m) {
+                continue;
+            }
 
             let game = _game.make_move(m);
             let line = PrevMove {
