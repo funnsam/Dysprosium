@@ -1,45 +1,57 @@
 #![warn(clippy::future_not_send)]
 
 use core::str::FromStr;
-use std::sync::{atomic::*, Arc};
-use api::{move_from_uci, Challenge, Direction, Event, GameEvent, GameState, LichessApi, Player, Speed, Variant};
-use chess::{Board, Color};
+use std::sync::{atomic::*, Arc, RwLock};
+use api::{move_from_uci, Challenge, Direction, Event, GameEvent, GameState, LichessApi, Player, Variant};
+use chess::{Board, BoardStatus, Color};
+use config::Config;
 use dysprosium::Game;
 
 mod api;
+mod config;
 mod log;
-
-const DISALLOWED_TIME_CONTROLS: &[Speed] = &[Speed::Correspondence, Speed::Classical];
-const EXCEPTION_USERS: &[&str] = &["funnsam"];
-const ACCEPT_RATED: bool = false;
-
-const THREADS_PER_GAME: usize = 2;
 
 pub struct LichessClient {
     api: LichessApi,
+    pub config: RwLock<Config>,
     pub active_games: AtomicUsize,
 }
 
 impl LichessClient {
     pub fn new(api: LichessApi) -> Self {
-        Self { api, active_games: AtomicUsize::new(0) }
+        Self {
+            api,
+            config: RwLock::default(),
+            active_games: AtomicUsize::new(0),
+        }
     }
 
     pub fn listen(self: Arc<Self>) {
+        Arc::clone(&self).listen_config();
+
         self.api.listen(|event| match event {
             Event::Challenge { challenge: Challenge { direction, id, challenger: Player { name: Some(challenger), .. }, variant: Variant { key: variant }, speed, rated } } => {
                 if direction == Some(Direction::Out) { return };
-                let is_su = EXCEPTION_USERS.contains(&challenger);
+
+                let config = self.config();
+
+                let is_su = config.superusers.iter().any(|i| i == challenger);
 
                 info!("user `{challenger}` challenged bot (id: `{id}`, variant: {variant:?}, time control: {speed:?}, rated: {rated})");
-                if !is_su && variant != "standard" {
+
+                let max_games = config.max_games.unwrap_or(usize::MAX);
+                if !is_su && self.active_games.load(Ordering::Relaxed) >= max_games {
+                    self.api.decline_challenge(id, "later");
+                } else if !is_su && variant != "standard" {
                     self.api.decline_challenge(id, "standard");
-                } else if !is_su && DISALLOWED_TIME_CONTROLS.contains(&speed) {
+                } else if !is_su && config.tc_blacklist.contains(&speed) {
                     self.api.decline_challenge(id, "timeControl");
-                } else if !is_su && !ACCEPT_RATED && rated {
+                } else if !is_su && !config.allow_rated && rated {
                     self.api.decline_challenge(id, "casual");
+                } else if !is_su && !config.allow_casual && !rated {
+                    self.api.decline_challenge(id, "rated");
                 } else {
-                    // self.api.accept_challenge(id).await;
+                    self.api.accept_challenge(id);
                 }
             },
             Event::GameStart { game: api::Game { id, color, fen, opponent, .. } } => {
@@ -61,7 +73,7 @@ impl LichessClient {
 
     fn play_game(self: Arc<Self>, game_id: String, game: dysprosium::Game, color: Color) {
         let mut engine = dysprosium::Engine::new(game, 64 * 1024 * 1024);
-        engine.start_smp(THREADS_PER_GAME - 1);
+        engine.start_smp(self.config().threads_per_game - 1);
 
         self.api.listen_game(&game_id, |event| match event {
             GameEvent::GameFull { initial_fen, state } => {
@@ -94,6 +106,13 @@ impl LichessClient {
     }
 
     fn play(&self, game_id: &str, color: Color, state: GameState<'_>, engine: &mut dysprosium::Engine) {
+        {
+            let game = engine.game.read();
+            if game.can_declare_draw() || game.board().status() != BoardStatus::Ongoing {
+                return;
+            }
+        }
+
         engine.time_control(None, match color {
             Color::White => dysprosium::TimeControl {
                 time_left: state.wtime,
