@@ -23,7 +23,7 @@ impl Game {
     }
 
     pub fn is_quiet(&self, mov: chess::ChessMove) -> bool {
-        mov.get_promotion().is_none() && !self.is_captute(mov)
+        mov.get_promotion().is_none() && !self.is_capture(mov)
     }
 
     pub fn make_move(&self, mov: chess::ChessMove) -> Self {

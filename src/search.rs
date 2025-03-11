@@ -243,12 +243,13 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             }
         }
 
-        let f_margin = 200 * depth as i16;
+        // check if futility pruning is applicable
+        let f_margin = 150 * depth as i16;
         let can_f_prune = !Node::PV
-            && depth <= 3
+            && depth <= 2
             && !in_check
             && !alpha.is_mate()
-            && *prev_move.eval + f_margin <= alpha;
+            && *prev_move.static_eval + f_margin <= alpha;
 
         let tte = self.trans_table.get(game.board().get_hash());
 
