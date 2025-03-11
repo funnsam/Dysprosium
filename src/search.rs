@@ -229,8 +229,14 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             game.board().pieces(Piece::Queen).0 != 0
         ) {
             let game = game.make_null_move().unwrap();
+            let line = PrevMove {
+                mov: prev_move.mov,
+                static_eval: EvalCell::new(game.board()),
+                prev_move: Some(prev_move),
+            };
+
             let r = 3 + depth / 3;
-            let eval = -self.zw_search::<Cut>(prev_move, &game, &killer, depth - r, ply + 1, 1 - beta);
+            let eval = -self.zw_search::<Cut>(&line, &game, &killer, depth - r, ply + 1, 1 - beta);
 
             if eval >= beta {
                 return (ChessMove::default(), eval.incr_mate(), NodeType::None);
