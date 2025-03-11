@@ -203,7 +203,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             let eval = evaluate_static(game.board());
             let margin = 120 * depth as i16;
 
-            if eval.0 - margin >= beta.0 {
+            if eval - margin >= beta {
                 // return (ChessMove::default(), Eval(((eval.0 as i32 + beta.0 as i32) / 2) as i16), NodeType::None);
                 return (ChessMove::default(), eval - margin, NodeType::None);
             }
