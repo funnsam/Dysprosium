@@ -38,9 +38,7 @@ impl Default for Config {
 
 pub fn load_config() -> Config {
     let src = std::fs::read_to_string(CONFIG_PATH).unwrap_or_else(|_| String::new());
-    let h = toml::from_str(&src).unwrap();
-    println!("{h:?}");
-    h
+    toml::from_str(&src).unwrap()
 }
 
 impl LichessClient {
