@@ -196,16 +196,16 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                     return (trans.next, eval, NodeType::None);
                 }
             }
+        }
 
-            // reversed futility pruning (aka: static null move)
-            if !in_check && depth <= 2 && !beta.is_mate() {
-                let eval = evaluate_static(game.board());
-                let margin = 120 * depth as i16;
+        // reversed futility pruning (aka: static null move)
+        if !Node::PV && !in_check && depth <= 2 && !beta.is_mate() {
+            let eval = evaluate_static(game.board());
+            let margin = 120 * depth as i16;
 
-                if eval.0 - margin >= beta.0 {
-                    // return (ChessMove::default(), Eval(((eval.0 as i32 + beta.0 as i32) / 2) as i16), NodeType::None);
-                    return (ChessMove::default(), eval - margin, NodeType::None);
-                }
+            if eval.0 - margin >= beta.0 {
+                // return (ChessMove::default(), Eval(((eval.0 as i32 + beta.0 as i32) / 2) as i16), NodeType::None);
+                return (ChessMove::default(), eval - margin, NodeType::None);
             }
         }
 
@@ -244,12 +244,12 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         }
 
         // check if futility pruning is applicable
-        let f_margin = 150 * depth as i16;
-        let can_f_prune = !Node::PV
-            && depth <= 2
-            && !in_check
-            && !alpha.is_mate()
-            && *prev_move.static_eval + f_margin <= alpha;
+        // let f_margin = 150 * depth as i16;
+        // let can_f_prune = !Node::PV
+        //     && depth <= 2
+        //     && !in_check
+        //     && !alpha.is_mate()
+        //     && *prev_move.static_eval + f_margin <= alpha;
 
         let tte = self.trans_table.get(game.board().get_hash());
 
@@ -266,9 +266,10 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         let mut children_searched = 0;
         let _game = &game;
         for (i, (m, _)) in moves.iter().copied().enumerate() {
-            if can_f_prune && children_searched > 0 && _game.is_quiet(m) {
-                continue;
-            }
+            // apply futility pruning if we could and if this move is quiet
+            // if can_f_prune && children_searched > 0 && _game.is_quiet(m) {
+            //     continue;
+            // }
 
             let game = _game.make_move(m);
             let line = PrevMove {
