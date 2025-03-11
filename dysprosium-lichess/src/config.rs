@@ -8,6 +8,8 @@ use crate::{api::Speed, info, LichessClient};
 const CONFIG_PATH: &str = "config.toml";
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
 pub struct Config {
     #[serde(default = "_false")]
     pub allow_rated: bool,
@@ -36,7 +38,9 @@ impl Default for Config {
 
 pub fn load_config() -> Config {
     let src = std::fs::read_to_string(CONFIG_PATH).unwrap_or_else(|_| String::new());
-    toml::from_str(&src).unwrap()
+    let h = toml::from_str(&src).unwrap();
+    println!("{h:?}");
+    h
 }
 
 impl LichessClient {
