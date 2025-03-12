@@ -63,13 +63,21 @@ impl SmpThread<'_, false> {
 
 impl<const MAIN: bool> SmpThread<'_, MAIN> {
     fn root_aspiration(&mut self, depth: usize, prev: Eval) -> (ChessMove, Eval) {
-        let (alpha, beta) = (prev - 25, prev + 25);
-        let (mov, eval, nt) = self.root_search(depth, alpha, beta);
+        let (mut aw, mut bw) = (25, 25);
+        let (mut mov, mut eval, mut nt) = self.root_search(depth, prev - aw, prev + bw);
 
-        if nt != NodeType::Pv {
-            let (mov, eval, _) = self.root_search(depth, Eval::MIN, Eval::MAX);
-            (mov, eval)
-        } else { (mov, eval) }
+        while nt != NodeType::Pv {
+            println!("{nt:?} {aw} {bw}");
+            match nt {
+                NodeType::All => aw = aw.saturating_mul(aw),
+                NodeType::Cut => bw = bw.saturating_mul(bw),
+                _ => todo!(),
+            }
+
+            (mov, eval, nt) = self.root_search(depth, prev - aw, prev + bw);
+        }
+
+        (mov, eval)
     }
 
     #[inline]
