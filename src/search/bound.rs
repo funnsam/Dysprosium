@@ -31,7 +31,7 @@ impl Bound {
 
     pub fn from_window(g: Eval, aw: i16, bw: i16) -> Self {
         let alpha = Eval(g.0.saturating_sub(aw));
-        let beta = Eval(g.0.saturating_sub(bw));
+        let beta = Eval(g.0.saturating_add(bw));
 
         Self::new(alpha, beta)
     }
