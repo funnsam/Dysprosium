@@ -236,7 +236,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             };
 
             let mut r = 3 + depth / 3;
-            r += line.is_improving() as usize;
+            r += prev_move.is_improving() as usize;
             let r = r.min(depth);
 
             let eval = -self.zw_search::<Cut>(&line, &game, &killer, depth - r, ply + 1, 1 - beta);
