@@ -244,12 +244,17 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         }
 
         // check if late move pruning is applicable
+        let lmp_threshold = depth * 5;
         let can_lmp = !Node::PV
-            && depth <= 2
+            && depth <= 4
             && !in_check;
+
         // check if futility pruning is applicable
         let f_margin = 150 * depth as i16;
-        let can_f_prune = can_lmp && *prev_move.static_eval + f_margin <= alpha;
+        let can_f_prune = !Node::PV
+            && depth <= 2
+            && !in_check
+            && *prev_move.static_eval + f_margin <= alpha;
 
         let tte = self.trans_table.get(game.board().get_hash());
 
@@ -272,7 +277,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             }
 
             // apply late move pruning
-            if can_lmp && children_searched > 10 && _game.is_quiet(m) {
+            if can_lmp && children_searched > lmp_threshold && _game.is_quiet(m) {
                 continue;
             }
 
