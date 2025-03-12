@@ -1,6 +1,6 @@
 use core::sync::atomic::Ordering;
 
-use crate::{*, eval::*, trans_table::*};
+use crate::{eval::*, line::{EvalCell, PrevMove}, trans_table::*, *};
 use chess::{BoardStatus, ChessMove, MoveGen, Piece};
 use move_order::KillerTable;
 use node::{Cut, NodeType, Pv};
@@ -82,7 +82,13 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         self.nodes_searched = 0;
 
         let game: Game = self.game.read().clone();
-        let (next, eval, nt) = self._evaluate_search::<Pv, true>(ChessMove::default(), &game, &KillerTable::new(), depth, 0, alpha, beta, false);
+        let line = PrevMove {
+            mov: ChessMove::default(),
+            static_eval: EvalCell::new(game.board()),
+            prev_move: None,
+        };
+
+        let (next, eval, nt) = self._evaluate_search::<Pv, true>(&line, &game, &KillerTable::new(), depth, 0, alpha, beta, false);
 
         self.store_tt(depth, &game, (next, eval, nt));
         self.total_nodes_searched.fetch_add(self.nodes_searched, Ordering::Relaxed);
@@ -101,7 +107,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
     #[inline]
     fn zw_search<Node: node::Node>(
         &mut self,
-        prev_move: ChessMove,
+        prev_move: &PrevMove,
         game: &Game,
         killer: &KillerTable,
         depth: usize,
@@ -115,7 +121,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
     #[inline]
     fn evaluate_search<Node: node::Node>(
         &mut self,
-        prev_move: ChessMove,
+        prev_move: &PrevMove,
         game: &Game,
         killer: &KillerTable,
         depth: usize,
@@ -150,7 +156,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
     fn _evaluate_search<Node: node::Node, const ROOT: bool>(
         &mut self,
-        prev_move: ChessMove,
+        prev_move: &PrevMove,
         game: &Game,
         p_killer: &KillerTable,
         depth: usize,
@@ -159,21 +165,10 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         beta: Eval,
         in_zw: bool,
     ) -> (ChessMove, Eval, NodeType) {
+        let in_check = game.board().checkers().0 != 0;
+
         if game.can_declare_draw() {
             return (ChessMove::default(), Eval(0), NodeType::None);
-        }
-
-        if !Node::PV {
-            if let Some(trans) = self.trans_table.get(game.board().get_hash()) {
-                let eval = trans.eval;
-                let node_type = trans.node_type();
-
-                if trans.depth as usize >= depth && (node_type == NodeType::Pv
-                    || (node_type == NodeType::Cut && eval >= beta)
-                    || (node_type == NodeType::All && eval < alpha)) {
-                    return (trans.next, eval, NodeType::None);
-                }
-            }
         }
 
         match game.board().status() {
@@ -190,6 +185,30 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             return (ChessMove::default(), self.quiescence_search(game, alpha, beta), NodeType::None);
         }
 
+        if !Node::PV {
+            if let Some(trans) = self.trans_table.get(game.board().get_hash()) {
+                let eval = trans.eval;
+                let node_type = trans.node_type();
+
+                if trans.depth as usize >= depth && (node_type == NodeType::Pv
+                    || (node_type == NodeType::Cut && eval >= beta)
+                    || (node_type == NodeType::All && eval < alpha)) {
+                    return (trans.next, eval, NodeType::None);
+                }
+            }
+        }
+
+        // reversed futility pruning (aka: static null move)
+        if !Node::PV && !in_check && depth <= 2 && !beta.is_mate() {
+            let eval = evaluate_static(game.board());
+            let margin = 120 * depth as i16;
+
+            if eval - margin >= beta {
+                // return (ChessMove::default(), Eval(((eval.0 as i32 + beta.0 as i32) / 2) as i16), NodeType::None);
+                return (ChessMove::default(), eval - margin, NodeType::None);
+            }
+        }
+
         let killer = KillerTable::new();
 
         // internal iterative reductions
@@ -202,8 +221,6 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             }
         }
 
-        let in_check = game.board().checkers().0 != 0;
-
         // null move pruning
         if !Node::PV && !in_check && depth >= 4 && (
             game.board().pieces(Piece::Knight).0 != 0 ||
@@ -212,13 +229,27 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             game.board().pieces(Piece::Queen).0 != 0
         ) {
             let game = game.make_null_move().unwrap();
+            let line = PrevMove {
+                mov: prev_move.mov,
+                static_eval: EvalCell::new(game.board()),
+                prev_move: Some(prev_move),
+            };
+
             let r = 3 + depth / 3;
-            let eval = -self.zw_search::<Cut>(prev_move, &game, &killer, depth - r, ply + 1, 1 - beta);
+            let eval = -self.zw_search::<Cut>(&line, &game, &killer, depth - r, ply + 1, 1 - beta);
 
             if eval >= beta {
                 return (ChessMove::default(), eval.incr_mate(), NodeType::None);
             }
         }
+
+        // check if futility pruning is applicable
+        let f_margin = 150 * depth as i16;
+        let can_f_prune = !Node::PV
+            && depth <= 2
+            && !in_check
+            && !alpha.is_mate()
+            && *prev_move.static_eval + f_margin <= alpha;
 
         let tte = self.trans_table.get(game.board().get_hash());
 
@@ -235,27 +266,23 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         let mut children_searched = 0;
         let _game = &game;
         for (i, (m, _)) in moves.iter().copied().enumerate() {
-            let game = _game.make_move(m);
-
-            // futility pruning: kill nodes with no potential
-            if !in_check && depth <= 2 {
-                let eval = -evaluate_static(game.board());
-                let margin = 100 * depth as i16 * depth as i16;
-
-                if eval.0 + margin < alpha.0 {
-                    if best.0 == ChessMove::default() {
-                        best = (m, eval - margin);
-                    }
-
-                    continue;
-                }
+            // apply futility pruning if we could and if this move is quiet
+            if can_f_prune && children_searched > 0 && _game.is_quiet(m) {
+                continue;
             }
+
+            let game = _game.make_move(m);
+            let line = PrevMove {
+                mov: m,
+                static_eval: EvalCell::new(game.board()),
+                prev_move: Some(prev_move),
+            };
 
             let can_reduce = depth >= 3 && !in_check && children_searched != 0;
 
             let mut eval = Eval(i16::MIN);
             let do_full_research = if can_reduce {
-                eval = -self.zw_search::<Node::Zw>(m, &game, &killer, depth / 2, ply + 1, -alpha);
+                eval = -self.zw_search::<Node::Zw>(&line, &game, &killer, depth / 2, ply + 1, -alpha);
 
                 if alpha < eval && depth / 2 < depth - 1 {
                     self.debug.research.inc();
@@ -269,12 +296,12 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             };
 
             if do_full_research {
-                eval = -self.zw_search::<Node::Zw>(m, &game, &killer, depth - 1, ply + 1, -alpha);
+                eval = -self.zw_search::<Node::Zw>(&line, &game, &killer, depth - 1, ply + 1, -alpha);
                 self.debug.all_full_zw.inc();
             }
 
             if Node::PV && (children_searched == 0 || alpha < eval) {
-                eval = -self.evaluate_search::<Pv>(m, &game, &killer, depth - 1, ply + 1, -beta, -alpha, in_zw);
+                eval = -self.evaluate_search::<Pv>(&line, &game, &killer, depth - 1, ply + 1, -beta, -alpha, in_zw);
 
                 self.debug.all_full.inc();
                 if do_full_research {
@@ -306,7 +333,8 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
                     self.hist_table.update(m, bonus);
                     p_killer.update(m, bonus);
-                    *self.countermove.get_mut(prev_move) = m;
+
+                    *self.countermove.get_mut(prev_move.mov) = m;
                 }
 
                 return (best.0, best.1.incr_mate(), NodeType::Cut);
