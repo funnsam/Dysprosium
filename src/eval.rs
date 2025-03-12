@@ -10,7 +10,7 @@ use chess::*;
 ///      min cp   0   max cp
 ///      -16383        16383
 /// ```
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Eval(pub i16);
 
 impl Eval {
