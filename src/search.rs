@@ -244,8 +244,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         }
 
         // check if late move pruning is applicable
-        let can_lmp = !Node::PV
-            && !in_check;
+        let can_lmp = !Node::PV && !in_check;
         let lmp_threshold = 4 + 2 * depth * depth;
 
         // check if futility pruning is applicable
@@ -275,7 +274,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             }
 
             // apply late move pruning
-            if can_lmp && children_searched > lmp_threshold && _game.is_quiet(m) {
+            if can_lmp && children_searched >= lmp_threshold && _game.is_quiet(m) {
                 continue;
             }
 
