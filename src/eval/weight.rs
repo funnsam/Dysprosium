@@ -4,16 +4,25 @@ use std::ops::Mul;
 
 use super::Eval;
 
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub struct Tracker<'a> {
+    pub value: i16,
+    #[cfg(feature = "eval-track")]
+    pub mul: f64,
+    #[cfg(feature = "eval-track")]
+    pub track: &'a RefCell<TrackerNode>,
+}
+
 #[derive(Default, Debug, Clone, PartialEq, PartialOrd)]
 pub struct Weight {
     pub value: i16,
     #[cfg(feature = "eval-track")]
-    pub track: RefCell<Tracker>,
+    pub track: RefCell<TrackerNode>,
 }
 
 #[cfg(feature = "eval-track")]
 #[derive(Default, Debug, Clone, PartialEq, PartialOrd)]
-pub struct Tracker {
+pub struct TrackerNode {
     pub derivative: f64,
     pub frequency: usize,
 }
@@ -28,23 +37,27 @@ impl Weight {
     }
 
     #[cfg(feature = "eval-track")]
-    pub fn reset_tracker(&self) -> Tracker {
+    pub fn reset_tracker(&self) -> TrackerNode {
         core::mem::take(&mut *self.track.borrow_mut())
     }
 }
 
-impl Mul<&Weight> for Eval {
-    type Output = Eval;
+impl Tracker<'_> {}
 
-    fn mul(self, rhs: &Weight) -> Self::Output {
-        let val = self.0 * rhs.value;
+impl<'a> Mul<&'a Weight> for Eval {
+    type Output = Tracker<'a>;
 
-        #[cfg(feature = "eval-track")] {
-            let mut track = rhs.track.borrow_mut();
-            track.derivative += val as f64;
-            track.frequency += 1;
+    fn mul(self, rhs: &'a Weight) -> Self::Output {
+        // #[cfg(feature = "eval-track")] {
+        //     let mut track = rhs.track.borrow_mut();
+        //     track.derivative += val as f64;
+        //     track.frequency += 1;
+        // }
+
+        Tracker {
+            value: self.0 * rhs.value,
+            mul: 1.0,
+            track: &rhs.track,
         }
-
-        Eval(val)
     }
 }
