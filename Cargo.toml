@@ -1,5 +1,5 @@
 [workspace]
-members = ["dysprosium-lichess","dysprosium-uci"]
+members = ["dysprosium-lichess","dysprosium-uci", "tuner"]
 
 [package]
 name = "dysprosium"
@@ -13,6 +13,9 @@ chess = { version = "4.0.0", git = "https://github.com/funnsam/chess.git" }
 fastrand = "2.3.0"
 fxhash = "0.2.1"
 parking_lot = "0.12.3"
+
+[features]
+eval-track = []
 
 [profile.release-debuginfo]
 inherits = "release"
