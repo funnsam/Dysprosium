@@ -1,9 +1,12 @@
 use core::sync::atomic::Ordering;
 
 use crate::{eval::*, line::{EvalCell, PrevMove}, trans_table::*, *};
+use bound::Bound;
 use chess::{BoardStatus, ChessMove, MoveGen, Piece};
 use move_order::KillerTable;
 use node::{Cut, NodeType, Pv};
+
+mod bound;
 
 impl Engine {
     pub fn best_move<F: FnMut(&Self, (ChessMove, Eval, usize)) -> bool>(&mut self, mut cont: F) -> (ChessMove, Eval, usize) {
@@ -14,7 +17,7 @@ impl Engine {
         let mut main_thread = self.new_thread::<true>(0);
 
         let can_time_out = self.can_time_out.swap(false, Ordering::Relaxed);
-        let prev = main_thread.root_search(1, Eval::MIN, Eval::MAX);
+        let prev = main_thread.root_search(1, Bound::MIN_MAX);
         self.can_time_out.store(can_time_out, Ordering::Relaxed);
         let mut prev = (prev.0, prev.1, 1);
         if !cont(self, prev) || self.soft_times_up() { return prev };
@@ -63,21 +66,33 @@ impl SmpThread<'_, false> {
 
 impl<const MAIN: bool> SmpThread<'_, MAIN> {
     fn root_aspiration(&mut self, depth: usize, prev: Eval) -> (ChessMove, Eval) {
-        let (alpha, beta) = (prev - 25, prev + 25);
-        let (mov, eval, nt) = self.root_search(depth, alpha, beta);
+        let mut delta = 13;
+        let mut bound = Bound::from_window(prev, delta, delta);
 
-        if nt != NodeType::Pv {
-            let (mov, eval, _) = self.root_search(depth, Eval::MIN, Eval::MAX);
-            (mov, eval)
-        } else { (mov, eval) }
+        let (mut mov, mut eval, mut nt) = self.root_search(depth, bound);
+
+        while nt != NodeType::None {
+            delta *= 2;
+
+            if eval <= bound.alpha {
+                bound.widen_window_alpha(prev, delta);
+            } else if eval >= bound.beta {
+                bound.widen_window_beta(prev, delta);
+            } else {
+                break;
+            }
+
+            (mov, eval, nt) = self.root_search(depth, bound);
+        }
+
+        (mov, eval)
     }
 
     #[inline]
     fn root_search(
         &mut self,
         depth: usize,
-        alpha: Eval,
-        beta: Eval,
+        bound: Bound,
     ) -> (ChessMove, Eval, NodeType) {
         self.nodes_searched = 0;
 
@@ -88,7 +103,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             prev_move: None,
         };
 
-        let (next, eval, nt) = self._evaluate_search::<Pv, true>(&line, &game, &KillerTable::new(), depth, 0, alpha, beta, false);
+        let (next, eval, nt) = self._evaluate_search::<Pv, true>(&line, &game, &KillerTable::new(), depth, 0, bound, false);
 
         self.store_tt(depth, &game, (next, eval, nt));
         self.total_nodes_searched.fetch_add(self.nodes_searched, Ordering::Relaxed);
@@ -114,7 +129,9 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         ply: usize,
         beta: Eval,
     ) -> Eval {
-        self.evaluate_search::<Node>(prev_move, game, killer, depth, ply, beta - 1, beta, true)
+        let bound = Bound::new(beta - 1, beta);
+
+        self.evaluate_search::<Node>(prev_move, game, killer, depth, ply, bound, true)
     }
 
     /// Perform an alpha-beta (fail-soft) negamax search and return the evaluation
@@ -126,11 +143,10 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         killer: &KillerTable,
         depth: usize,
         ply: usize,
-        alpha: Eval,
-        beta: Eval,
+        bound: Bound,
         in_zw: bool,
     ) -> Eval {
-        let (next, eval, nt) = self._evaluate_search::<Node, false>(prev_move, game, killer, depth, ply, alpha, beta, in_zw);
+        let (next, eval, nt) = self._evaluate_search::<Node, false>(prev_move, game, killer, depth, ply, bound, in_zw);
 
         self.store_tt(depth, game, (next, eval, nt));
 
@@ -161,8 +177,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         p_killer: &KillerTable,
         depth: usize,
         ply: usize,
-        mut alpha: Eval,
-        beta: Eval,
+        mut bound: Bound,
         in_zw: bool,
     ) -> (ChessMove, Eval, NodeType) {
         let in_check = game.board().checkers().0 != 0;
@@ -182,7 +197,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         }
 
         if depth == 0 {
-            return (ChessMove::default(), self.quiescence_search(game, alpha, beta), NodeType::None);
+            return (ChessMove::default(), self.quiescence_search(game, bound), NodeType::None);
         }
 
         if !Node::PV {
@@ -191,19 +206,19 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 let node_type = trans.node_type();
 
                 if trans.depth as usize >= depth && (node_type == NodeType::Pv
-                    || (node_type == NodeType::Cut && eval >= beta)
-                    || (node_type == NodeType::All && eval < alpha)) {
+                    || (node_type == NodeType::Cut && eval >= bound.beta)
+                    || (node_type == NodeType::All && eval < bound.alpha)) {
                     return (trans.next, eval, NodeType::None);
                 }
             }
         }
 
         // reversed futility pruning (aka: static null move)
-        if !Node::PV && !in_check && depth <= 2 && !beta.is_mate() {
+        if !Node::PV && !in_check && depth <= 2 && !bound.beta.is_mate() {
             let eval = evaluate_static(game.board());
             let margin = 120 * depth as i16;
 
-            if eval - margin >= beta {
+            if eval - margin >= bound.beta {
                 // return (ChessMove::default(), Eval(((eval.0 as i32 + beta.0 as i32) / 2) as i16), NodeType::None);
                 return (ChessMove::default(), eval - margin, NodeType::None);
             }
@@ -213,10 +228,10 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
         // internal iterative reductions
         if !ROOT && depth >= 4 && self.trans_table.get(game.board().get_hash()).is_none() {
-            let low = self._evaluate_search::<Node, ROOT>(prev_move, game, &killer, depth / 4, ply, alpha, beta, false);
+            let low = self._evaluate_search::<Node, ROOT>(prev_move, game, &killer, depth / 4, ply, bound, false);
             self.store_tt(depth / 4, game, low);
 
-            if low.1 <= alpha {
+            if low.1 <= bound.alpha {
                 return (low.0, low.1, NodeType::None);
             }
         }
@@ -236,9 +251,9 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             };
 
             let r = 3 + depth / 3;
-            let eval = -self.zw_search::<Cut>(&line, &game, &killer, depth - r, ply + 1, 1 - beta);
+            let eval = -self.zw_search::<Cut>(&line, &game, &killer, depth - r, ply + 1, 1 - bound.beta);
 
-            if eval >= beta {
+            if eval >= bound.beta {
                 return (ChessMove::default(), eval.incr_mate(), NodeType::None);
             }
         }
@@ -249,7 +264,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             && !in_check;
         // check if futility pruning is applicable
         let f_margin = 150 * depth as i16;
-        let can_f_prune = can_lmp && *prev_move.static_eval + f_margin <= alpha;
+        let can_f_prune = can_lmp && *prev_move.static_eval + f_margin <= bound.alpha;
 
         let tte = self.trans_table.get(game.board().get_hash());
 
@@ -287,26 +302,26 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
             let mut eval = Eval(i16::MIN);
             let do_full_research = if can_reduce {
-                eval = -self.zw_search::<Node::Zw>(&line, &game, &killer, depth / 2, ply + 1, -alpha);
+                eval = -self.zw_search::<Node::Zw>(&line, &game, &killer, depth / 2, ply + 1, -bound.alpha);
 
-                if alpha < eval && depth / 2 < depth - 1 {
+                if bound.alpha < eval && depth / 2 < depth - 1 {
                     self.debug.research.inc();
                 } else {
                     self.debug.no_research.inc();
                 }
 
-                alpha < eval && depth / 2 < depth - 1
+                bound.alpha < eval && depth / 2 < depth - 1
             } else {
                 !Node::PV || children_searched != 0
             };
 
             if do_full_research {
-                eval = -self.zw_search::<Node::Zw>(&line, &game, &killer, depth - 1, ply + 1, -alpha);
+                eval = -self.zw_search::<Node::Zw>(&line, &game, &killer, depth - 1, ply + 1, -bound.alpha);
                 self.debug.all_full_zw.inc();
             }
 
-            if Node::PV && (children_searched == 0 || alpha < eval) {
-                eval = -self.evaluate_search::<Pv>(&line, &game, &killer, depth - 1, ply + 1, -beta, -alpha, in_zw);
+            if Node::PV && (children_searched == 0 || bound.alpha < eval) {
+                eval = -self.evaluate_search::<Pv>(&line, &game, &killer, depth - 1, ply + 1, -bound, in_zw);
 
                 self.debug.all_full.inc();
                 if do_full_research {
@@ -323,9 +338,10 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
             if eval > best.1 || best.0 == ChessMove::default() {
                 best = (m, eval);
-                alpha = alpha.max(eval);
+                bound.alpha = bound.alpha.max(eval);
             }
-            if eval >= beta {
+
+            if eval >= bound.beta {
                 if !_game.is_capture(m) {
                     let bonus = 300 * depth as isize - 250;
 
@@ -348,14 +364,14 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             children_searched += 1;
         }
 
-        (best.0, best.1.incr_mate(), if best.1 == alpha { NodeType::All } else { NodeType::Pv })
+        (best.0, best.1.incr_mate(), if best.1 == bound.alpha { NodeType::All } else { NodeType::Pv })
     }
 
-    fn quiescence_search(&mut self, game: &Game, mut alpha: Eval, beta: Eval) -> Eval {
+    fn quiescence_search(&mut self, game: &Game, mut bound: Bound) -> Eval {
         let standing_pat = evaluate_static(game.board());
         // TODO: failing to standing pat makes sprt fail, need investigation
-        if standing_pat >= beta { return beta; }
-        alpha = alpha.max(standing_pat);
+        if standing_pat >= bound.beta { return bound.beta; }
+        bound.alpha = bound.alpha.max(standing_pat);
         let mut best = standing_pat;
 
         let mut moves = MoveGen::new_legal(game.board());
@@ -365,14 +381,14 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             if see(game, m) < 0 { continue };
 
             let game = game.make_move(m);
-            let eval = -self.quiescence_search(&game, -beta, -alpha);
+            let eval = -self.quiescence_search(&game, -bound);
             self.nodes_searched += 1;
 
             if eval > best {
                 best = eval;
-                alpha = alpha.max(eval);
+                bound.alpha = bound.alpha.max(eval);
             }
-            if eval >= beta {
+            if eval >= bound.beta {
                 return best;
             }
         }
