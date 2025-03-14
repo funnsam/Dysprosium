@@ -103,7 +103,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             prev_move: None,
         };
 
-        let (next, eval, nt) = self._evaluate_search::<Pv, true>(&line, &game, &KillerTable::new(), depth, 0, bound, false);
+        let (next, eval, nt) = self._evaluate_search::<Pv, true, false>(&line, &game, &KillerTable::new(), depth, 0, bound, false);
 
         self.store_tt(depth, &game, (next, eval, nt));
         self.total_nodes_searched.fetch_add(self.nodes_searched, Ordering::Relaxed);
@@ -120,7 +120,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
     }
 
     #[inline]
-    fn zw_search<Node: node::Node>(
+    fn zw_search<Node: node::Node, const Q_SEARCH: bool>(
         &mut self,
         prev_move: &PrevMove,
         game: &Game,
@@ -131,12 +131,12 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
     ) -> Eval {
         let bound = Bound::new(beta - 1, beta);
 
-        self.evaluate_search::<Node>(prev_move, game, killer, depth, ply, bound, true)
+        self.evaluate_search::<Node, Q_SEARCH>(prev_move, game, killer, depth, ply, bound, true)
     }
 
     /// Perform an alpha-beta (fail-soft) negamax search and return the evaluation
     #[inline]
-    fn evaluate_search<Node: node::Node>(
+    fn evaluate_search<Node: node::Node, const Q_SEARCH: bool>(
         &mut self,
         prev_move: &PrevMove,
         game: &Game,
@@ -146,9 +146,11 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         bound: Bound,
         in_zw: bool,
     ) -> Eval {
-        let (next, eval, nt) = self._evaluate_search::<Node, false>(prev_move, game, killer, depth, ply, bound, in_zw);
+        let (next, eval, nt) = self._evaluate_search::<Node, false, Q_SEARCH>(prev_move, game, killer, depth, ply, bound, in_zw);
 
-        self.store_tt(depth, game, (next, eval, nt));
+        if !Q_SEARCH {
+            self.store_tt(depth, game, (next, eval, nt));
+        }
 
         eval
     }
@@ -170,7 +172,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         }
     }
 
-    fn _evaluate_search<Node: node::Node, const ROOT: bool>(
+    fn _evaluate_search<Node: node::Node, const ROOT: bool, const Q_SEARCH: bool>(
         &mut self,
         prev_move: &PrevMove,
         game: &Game,
@@ -182,22 +184,24 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
     ) -> (ChessMove, Eval, NodeType) {
         let in_check = game.board().checkers().0 != 0;
 
-        if game.can_declare_draw() {
-            return (ChessMove::default(), Eval(0), NodeType::None);
-        }
+        if !Q_SEARCH {
+            if game.can_declare_draw() {
+                return (ChessMove::default(), Eval(0), NodeType::None);
+            }
 
-        match game.board().status() {
-            BoardStatus::Ongoing => {},
-            BoardStatus::Checkmate => return (ChessMove::default(), -Eval::M0, NodeType::None),
-            BoardStatus::Stalemate => return (ChessMove::default(), Eval(0), NodeType::None),
-        }
+            match game.board().status() {
+                BoardStatus::Ongoing => {},
+                BoardStatus::Checkmate => return (ChessMove::default(), -Eval::M0, NodeType::None),
+                BoardStatus::Stalemate => return (ChessMove::default(), Eval(0), NodeType::None),
+            }
 
-        if self.abort() {
-            return (ChessMove::default(), Eval(0), NodeType::None);
-        }
+            if self.abort() {
+                return (ChessMove::default(), Eval(0), NodeType::None);
+            }
 
-        if depth == 0 {
-            return (ChessMove::default(), self.quiescence_search(game, bound), NodeType::None);
+            if depth == 0 {
+                return (ChessMove::default(), self.quiescence_search::<Node>(prev_move, game, p_killer, ply, bound), NodeType::None);
+            }
         }
 
         if !Node::PV {
@@ -213,9 +217,16 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             }
         }
 
+        if Q_SEARCH {
+            let sp = *prev_move.static_eval;
+            if sp >= bound.beta { return (ChessMove::default(), sp, NodeType::None) };
+
+            bound.alpha = bound.alpha.max(sp);
+        }
+
         // reversed futility pruning (aka: static null move)
         if !Node::PV && !in_check && depth <= 2 && !bound.beta.is_mate() {
-            let eval = evaluate_static(game.board());
+            let eval = *prev_move.static_eval;
             let margin = 120 * depth as i16;
 
             if eval - margin >= bound.beta {
@@ -227,8 +238,8 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         let killer = KillerTable::new();
 
         // internal iterative reductions
-        if !ROOT && depth >= 4 && self.trans_table.get(game.board().get_hash()).is_none() {
-            let low = self._evaluate_search::<Node, ROOT>(prev_move, game, &killer, depth / 4, ply, bound, false);
+        if !Q_SEARCH && !ROOT && depth >= 4 && self.trans_table.get(game.board().get_hash()).is_none() {
+            let low = self._evaluate_search::<Node, ROOT, false>(prev_move, game, &killer, depth / 4, ply, bound, false);
             self.store_tt(depth / 4, game, low);
 
             if low.1 <= bound.alpha {
@@ -237,7 +248,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         }
 
         // null move pruning
-        if !Node::PV && !in_check && depth >= 4 && (
+        if !Q_SEARCH && !Node::PV && !in_check && depth >= 4 && (
             game.board().pieces(Piece::Knight).0 != 0 ||
             game.board().pieces(Piece::Bishop).0 != 0 ||
             game.board().pieces(Piece::Rook).0 != 0 ||
@@ -251,7 +262,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             };
 
             let r = 3 + depth / 3;
-            let eval = -self.zw_search::<Cut>(&line, &game, &killer, depth - r, ply + 1, 1 - bound.beta);
+            let eval = -self.zw_search::<Cut, Q_SEARCH>(&line, &game, &killer, depth - r, ply + 1, 1 - bound.beta);
 
             if eval >= bound.beta {
                 return (ChessMove::default(), eval.incr_mate(), NodeType::None);
@@ -259,7 +270,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         }
 
         // check if late move pruning is applicable
-        let can_lmp = !Node::PV && !in_check;
+        let can_lmp = !Q_SEARCH && !Node::PV && !in_check;
         let lmp_threshold = 4 + 2 * depth * depth;
 
         // check if futility pruning is applicable
@@ -270,7 +281,12 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
         let tte = self.trans_table.get(game.board().get_hash());
 
-        let mut moves = MoveGen::new_legal(game.board())
+        let mut movegen = MoveGen::new_legal(game.board());
+        if Q_SEARCH {
+            movegen.set_iterator_mask(*game.board().combined());
+        }
+
+        let mut moves = movegen
             .map(|m| (m, self.move_score(m, prev_move, game, &tte, &p_killer)))
             .collect::<arrayvec::ArrayVec<_, 256>>();
         moves.sort_unstable_by_key(|i| -i.1);
@@ -279,7 +295,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             moves.rotate_left((self.index / 2) % len);
         }
 
-        let mut best = (ChessMove::default(), Eval::MIN);
+        let mut best = (ChessMove::default(), if Q_SEARCH { *prev_move.static_eval } else { Eval::MIN });
         let mut children_searched = 0;
         let _game = &game;
         for (i, (m, _)) in moves.iter().copied().enumerate() {
@@ -293,6 +309,8 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 continue;
             }
 
+            if Q_SEARCH && see(game, m) < 0 { continue };
+
             let game = _game.make_move(m);
             let line = PrevMove {
                 mov: m,
@@ -300,11 +318,11 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 prev_move: Some(prev_move),
             };
 
-            let can_reduce = depth >= 3 && !in_check && children_searched != 0;
+            let can_reduce = !Q_SEARCH && depth >= 3 && !in_check && children_searched != 0;
 
             let mut eval = Eval(i16::MIN);
             let do_full_research = if can_reduce {
-                eval = -self.zw_search::<Node::Zw>(&line, &game, &killer, depth / 2, ply + 1, -bound.alpha);
+                eval = -self.zw_search::<Node::Zw, Q_SEARCH>(&line, &game, &killer, depth / 2, ply + 1, -bound.alpha);
 
                 if bound.alpha < eval && depth / 2 < depth - 1 {
                     self.debug.research.inc();
@@ -318,12 +336,12 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             };
 
             if do_full_research {
-                eval = -self.zw_search::<Node::Zw>(&line, &game, &killer, depth - 1, ply + 1, -bound.alpha);
+                eval = -self.zw_search::<Node::Zw, Q_SEARCH>(&line, &game, &killer, depth - 1, ply + 1, -bound.alpha);
                 self.debug.all_full_zw.inc();
             }
 
             if Node::PV && (children_searched == 0 || bound.alpha < eval) {
-                eval = -self.evaluate_search::<Pv>(&line, &game, &killer, depth - 1, ply + 1, -bound, in_zw);
+                eval = -self.evaluate_search::<Pv, Q_SEARCH>(&line, &game, &killer, depth - 1, ply + 1, -bound, in_zw);
 
                 self.debug.all_full.inc();
                 if do_full_research {
@@ -369,32 +387,14 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         (best.0, best.1.incr_mate(), if best.1 == bound.alpha { NodeType::All } else { NodeType::Pv })
     }
 
-    fn quiescence_search(&mut self, game: &Game, mut bound: Bound) -> Eval {
-        let standing_pat = evaluate_static(game.board());
-        // TODO: failing to standing pat makes sprt fail, need investigation
-        if standing_pat >= bound.beta { return bound.beta; }
-        bound.alpha = bound.alpha.max(standing_pat);
-        let mut best = standing_pat;
-
-        let mut moves = MoveGen::new_legal(game.board());
-        moves.set_iterator_mask(*game.board().combined());
-
-        for m in moves {
-            if see(game, m) < 0 { continue };
-
-            let game = game.make_move(m);
-            let eval = -self.quiescence_search(&game, -bound);
-            self.nodes_searched += 1;
-
-            if eval > best {
-                best = eval;
-                bound.alpha = bound.alpha.max(eval);
-            }
-            if eval >= bound.beta {
-                return best;
-            }
-        }
-
-        best
+    fn quiescence_search<Node: node::Node>(
+        &mut self,
+        prev_move: &PrevMove,
+        game: &Game,
+        p_killer: &KillerTable,
+        ply: usize,
+        bound: Bound,
+    ) -> Eval {
+        self._evaluate_search::<Node, false, true>(prev_move, game, p_killer, 0, ply, bound, false).1
     }
 }
