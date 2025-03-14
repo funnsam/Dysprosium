@@ -333,10 +333,10 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 continue;
             }
 
-            #[cfg(feature = "uci")]
-            if MAIN && ROOT && depth >= 25 {
-                println!("info depth {depth} nodes {} currmove {m} string {bound:?}", self.nodes());
-            }
+            // #[cfg(feature = "uci")]
+            // if MAIN && ROOT && depth >= 25 {
+            //     println!("info depth {depth} nodes {} currmove {m} string {bound:?}", self.nodes());
+            // }
 
             let game = _game.make_move(m);
             let line = PrevMove {
