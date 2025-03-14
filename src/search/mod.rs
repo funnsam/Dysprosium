@@ -371,8 +371,8 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
     fn quiescence_search(&mut self, game: &Game, mut bound: Bound) -> Eval {
         let standing_pat = evaluate_static(game.board());
-        // TODO: failing to standing pat makes sprt fail, need investigation
-        if standing_pat >= bound.beta { return bound.beta; }
+
+        if standing_pat >= bound.beta { return standing_pat };
         bound.alpha = bound.alpha.max(standing_pat);
         let mut best = standing_pat;
 
