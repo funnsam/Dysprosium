@@ -266,6 +266,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         let f_margin = 150 * depth as i16;
         let can_f_prune = can_lmp
             && depth <= 2
+            && !bound.alpha.is_mate()
             && *prev_move.static_eval + f_margin <= bound.alpha;
 
         let tte = self.trans_table.get(game.board().get_hash());
