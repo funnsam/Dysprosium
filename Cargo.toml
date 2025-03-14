@@ -14,6 +14,9 @@ fastrand = "2.3.0"
 fxhash = "0.2.1"
 parking_lot = "0.12.3"
 
+[features]
+uci = []
+
 [profile.release-debuginfo]
 inherits = "release"
 debug = true

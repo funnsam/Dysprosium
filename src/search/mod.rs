@@ -111,6 +111,46 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         (next, eval, nt)
     }
 
+    fn aspiration_search<Node: node::Node>(
+        &mut self,
+        prev_move: &PrevMove,
+        game: &Game,
+        killer: &KillerTable,
+        depth: usize,
+        ply: usize,
+        bound: Bound,
+        in_zw: bool,
+    ) -> Eval {
+        const INIT_DELTA: i16 = 25;
+
+        if depth <= 20 || bound.beta.0 - bound.alpha.0 <= INIT_DELTA * 2 {
+            return self.evaluate_search::<Node>(prev_move, game, killer, depth, ply, bound, in_zw);
+        }
+
+        let prev = Eval(((bound.alpha.0 as i32 + bound.beta.0 as i32) / 2) as i16);
+
+        let mut delta = INIT_DELTA;
+        let mut bound = Bound::from_window(prev, delta, delta);
+
+        let mut eval = self.evaluate_search::<Node>(prev_move, game, killer, depth, ply, bound, in_zw);
+
+        while !self.abort() {
+            delta *= 2;
+
+            if eval <= bound.alpha {
+                bound.widen_window_alpha(prev, delta);
+            } else if eval >= bound.beta {
+                bound.widen_window_beta(prev, delta);
+            } else {
+                break;
+            }
+
+            eval = self.evaluate_search::<Node>(prev_move, game, killer, depth, ply, bound, in_zw);
+        }
+
+        eval
+    }
+
     fn abort(&self) -> bool {
         if !MAIN {
             self.smp_abort.initiated()
@@ -293,6 +333,11 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 continue;
             }
 
+            #[cfg(feature = "uci")]
+            if MAIN && ROOT && depth >= 25 {
+                println!("info depth {depth} nodes {} currmove {m} string {bound:?}", self.nodes());
+            }
+
             let game = _game.make_move(m);
             let line = PrevMove {
                 mov: m,
@@ -323,7 +368,8 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             }
 
             if Node::PV && (children_searched == 0 || bound.alpha < eval) {
-                eval = -self.evaluate_search::<Pv>(&line, &game, &killer, depth - 1, ply + 1, -bound, in_zw);
+                // eval = -self.evaluate_search::<Pv>(&line, &game, &killer, depth - 1, ply + 1, -bound, in_zw);
+                eval = -self.aspiration_search::<Pv>(&line, &game, &killer, depth - 1, ply + 1, -bound, in_zw);
 
                 self.debug.all_full.inc();
                 if do_full_research {
@@ -333,10 +379,6 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
             if self.abort() { return (best.0, best.1.incr_mate(), NodeType::None) };
             self.nodes_searched += 1;
-
-            // if ROOT {
-            //     println!(" {m} {eval} α{alpha} β{beta} {:?}", self.find_pv(m, 100).into_iter().map(|i| i.to_string()).collect::<Vec<_>>());
-            // }
 
             if eval > best.1 || best.0 == ChessMove::default() {
                 best = (m, eval);
