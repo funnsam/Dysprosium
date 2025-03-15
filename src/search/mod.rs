@@ -66,14 +66,26 @@ impl SmpThread<'_, false> {
 
 impl<const MAIN: bool> SmpThread<'_, MAIN> {
     fn root_aspiration(&mut self, depth: usize, prev: Eval) -> (ChessMove, Eval) {
-        let bound = Bound::from_window(prev, 25, 25);
-        let (mov, eval, nt) = self.root_search(depth, bound);
+        let mut delta = 13;
+        let mut bound = Bound::from_window(prev, delta, delta);
 
-        if nt != NodeType::Pv {
-            let (mov, eval, _) = self.root_search(depth, Bound::MIN_MAX);
+        let (mut mov, mut eval, mut nt) = self.root_search(depth, bound);
 
-            (mov, eval)
-        } else { (mov, eval) }
+        while nt != NodeType::None {
+            delta *= 2;
+
+            if eval <= bound.alpha {
+                bound.widen_window_alpha(prev, delta);
+            } else if eval >= bound.beta {
+                bound.widen_window_beta(prev, delta);
+            } else {
+                break;
+            }
+
+            (mov, eval, nt) = self.root_search(depth, bound);
+        }
+
+        (mov, eval)
     }
 
     #[inline]
@@ -246,12 +258,14 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             }
         }
 
+        // check if late move pruning is applicable
+        let can_lmp = !Node::PV && !in_check;
+        let lmp_threshold = 4 + 2 * depth * depth;
+
         // check if futility pruning is applicable
         let f_margin = 150 * depth as i16;
-        let can_f_prune = !Node::PV
+        let can_f_prune = can_lmp
             && depth <= 2
-            && !in_check
-            && !bound.alpha.is_mate()
             && prev_move.static_eval.get(&self.eval_params) + f_margin <= bound.alpha;
 
         let tte = self.trans_table.get(game.board().get_hash());
@@ -271,6 +285,11 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         for (i, (m, _)) in moves.iter().copied().enumerate() {
             // apply futility pruning if we could and if this move is quiet
             if can_f_prune && children_searched > 0 && _game.is_quiet(m) {
+                continue;
+            }
+
+            // apply late move pruning
+            if can_lmp && children_searched >= lmp_threshold && _game.is_quiet(m) {
                 continue;
             }
 

@@ -35,4 +35,12 @@ impl Bound {
 
         Self::new(alpha, beta)
     }
+
+    pub fn widen_window_alpha(&mut self, orig: Eval, by: i16) {
+        self.alpha.0 = orig.0.saturating_sub(by);
+    }
+
+    pub fn widen_window_beta(&mut self, orig: Eval, by: i16) {
+        self.beta.0 = orig.0.saturating_add(by);
+    }
 }
