@@ -1,44 +1,38 @@
-#[cfg(feature = "eval-track")]
-use core::cell::RefCell;
-use std::ops::{Add, AddAssign, Mul, MulAssign};
+use core::cell::Cell;
+use core::marker::PhantomData;
+use core::ops::{AddAssign, DivAssign, MulAssign, SubAssign};
 
+#[cfg(feature = "eval-track")]
 use arrayvec::ArrayVec;
 
-use super::Eval;
-
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Default, Debug, Clone, PartialEq, PartialOrd)]
 pub struct Tracker<'a> {
     pub value: i16,
     #[cfg(feature = "eval-track")]
-    pub track: ArrayVec<(&'a RefCell<TrackerNode>, f64), 256>,
+    pub track: ArrayVec<(&'a WeightCell, f64), 256>,
+    pub _phantom: PhantomData<&'a ()>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, PartialOrd)]
+pub type WeightCell = Cell<Weight>;
+
+#[derive(Default, Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Weight {
     pub value: i16,
     #[cfg(feature = "eval-track")]
-    pub track: RefCell<TrackerNode>,
-}
-
-#[cfg(feature = "eval-track")]
-#[derive(Default, Debug, Clone, PartialEq, PartialOrd)]
-pub struct TrackerNode {
     pub derivative: f64,
+    #[cfg(feature = "eval-track")]
     pub frequency: usize,
 }
 
 impl Weight {
-    pub fn new(value: i16) -> Self {
+    pub const fn new(value: i16) -> Self {
         Self {
             value,
             #[cfg(feature = "eval-track")]
-            track: RefCell::default(),
+            derivative: 0.0,
+            #[cfg(feature = "eval-track")]
+            frequency: 0,
         }
-    }
-
-    #[cfg(feature = "eval-track")]
-    pub fn reset_tracker(&self) -> TrackerNode {
-        core::mem::take(&mut *self.track.borrow_mut())
     }
 }
 
@@ -48,17 +42,18 @@ impl Tracker<'_> {
     }
 }
 
-impl<'a> From<&'a Weight> for Tracker<'a> {
-    fn from(value: &'a Weight) -> Self {
+impl<'a> From<&'a WeightCell> for Tracker<'a> {
+    fn from(value: &'a WeightCell) -> Self {
         #[cfg(feature = "eval-track")]
         let mut track = ArrayVec::new_const();
         #[cfg(feature = "eval-track")]
-        track.push((&value.track, 1.0));
+        track.push((value, 1.0));
 
         Self {
-            value: value.value,
+            value: value.get().value,
             #[cfg(feature = "eval-track")]
             track,
+            _phantom: PhantomData,
         }
     }
 }
@@ -71,12 +66,32 @@ impl<'a> AddAssign<Tracker<'a>> for Tracker<'a> {
     }
 }
 
+impl<'a> SubAssign<Tracker<'a>> for Tracker<'a> {
+    fn sub_assign(&mut self, rhs: Tracker<'a>) {
+        self.value += rhs.value;
+        #[cfg(feature = "eval-track")]
+        self.track.extend(rhs.track.into_iter().map(|i| (i.0, -i.1)));
+    }
+}
+
 impl<'a> MulAssign<i16> for Tracker<'a> {
     fn mul_assign(&mut self, rhs: i16) {
         self.value *= rhs;
 
+        #[cfg(feature = "eval-track")]
         for i in self.track.iter_mut() {
             i.1 *= rhs as f64;
+        }
+    }
+}
+
+impl<'a> DivAssign<i16> for Tracker<'a> {
+    fn div_assign(&mut self, rhs: i16) {
+        self.value /= rhs;
+
+        #[cfg(feature = "eval-track")]
+        for i in self.track.iter_mut() {
+            i.1 /= rhs as f64;
         }
     }
 }
