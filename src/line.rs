@@ -1,4 +1,4 @@
-use core::{cell::OnceCell, ops::Deref};
+use core::cell::OnceCell;
 
 use chess::{Board, ChessMove};
 

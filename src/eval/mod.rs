@@ -77,8 +77,8 @@ impl EvalParams {
         let mg_phase = phase.min(24);
         let eg_phase = 24 - mg_phase;
 
-        let mut eval = Tracker::<i32>::from(mg_eval * mg_phase as i16)
-            + Tracker::from(eg_eval * eg_phase as i16);
+        let mut eval = Tracker::from(mg_eval) * mg_phase as i32
+            + Tracker::from(eg_eval) * eg_phase as i32;
         eval /= 24;
 
         Eval(eval.value() as i16)
