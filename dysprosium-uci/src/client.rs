@@ -53,7 +53,8 @@ impl State {
                 *self.engine.game.write() = position;
             },
             Some(uci::UciCommand::Move(m)) => {
-                *self.engine.game.write() = self.engine.game.read().make_move(m)
+                let new = self.engine.game.read().make_move(m);
+                *self.engine.game.write() = new;
             },
             Some(uci::UciCommand::Go { depth: target_depth, movetime, wtime, btime, movestogo }) => {
                 let tc = if matches!(self.engine.game.read().board().side_to_move(), chess::Color::White) {
@@ -82,7 +83,7 @@ impl State {
             Some(uci::UciCommand::Eval) => println!(
                 "{:#}Eval: {}",
                 self.engine.game.read(),
-                evaluate_static(self.engine.game.read().board()),
+                EvalParams::default().evaluate_static(self.engine.game.read().board()),
             ),
             Some(uci::UciCommand::Bench) => self.bench(),
             None => {},

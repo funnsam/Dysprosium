@@ -1,55 +1,90 @@
 use chess::*;
+use weight::{Tracker, Weight, WeightCell};
 
 pub use eval::Eval;
 
 mod eval;
 mod weight;
 
-/// Mostly PeSTO's evaluation with rook on open file bonus
-pub fn evaluate_static(board: &Board) -> Eval {
-    let mut mid_game = [0, 0];
-    let mut end_game = [0, 0];
-    let mut phase = 0;
+#[derive(Debug, Clone)]
+pub struct EvalParams {
+    pst_mid: [WeightCell; 6 * 64],
+    pst_end: [WeightCell; 6 * 64],
 
-    for square in board.combined().into_iter() {
-        // SAFETY: only squares with things on it are checked
-        let piece = unsafe { board.piece_on(square).unwrap_unchecked() };
-        let color = unsafe { board.color_on(square).unwrap_unchecked() };
+    rook_open_file_bonus: WeightCell,
+    unshield_king_penalty: WeightCell,
+}
 
-        // rook on open file bonus
-        let rook_on_open_file = (piece == Piece::Rook
-            && (board.pieces(Piece::Pawn) & chess::get_file(square.get_file())).0 == 0
-        ) as i16 * 20;
-        let pawn_shield = if piece == Piece::King {
-            // TODO: open file penalty fails SPRT
-            //
-            // let mut open_files = 0;
-            // if let Some(sq) = square.left() {
-            //     open_files += ((board.pieces(Piece::Pawn) & board.color_combined(color) & chess::get_file(sq.get_file())).0 == 0) as i16;
-            // }
-            // if let Some(sq) = square.right() {
-            //     open_files += ((board.pieces(Piece::Pawn) & board.color_combined(color) & chess::get_file(sq.get_file())).0 == 0) as i16;
-            // }
+impl Default for EvalParams {
+    fn default() -> Self {
+        Self {
+            pst_mid: core::array::from_fn(|i| {
+                let val = PIECE_VALUE_MID[i / 64];
+                Weight::new(PIECE_SQUARE_TABLE_MID[i] + val).into()
+            }),
+            pst_end: core::array::from_fn(|i| {
+                let val = PIECE_VALUE_END[i / 64];
+                Weight::new(PIECE_SQUARE_TABLE_END[i] + val).into()
+            }),
 
-            let king_center = square.uforward(color);
-            let king_pawns = (board.pieces(Piece::Pawn) & (chess::get_king_moves(king_center) | BitBoard::from_square(king_center))).popcnt();
-
-            -(3_i16.saturating_sub(king_pawns as i16) * 15) // + open_files * 50)
-        } else { 0 };
-
-        let idx = (square.to_index() ^ (0b111_000 * (color == Color::Black) as usize)) | (piece.to_index() << 6);
-        mid_game[color.to_index()] += rook_on_open_file + pawn_shield + PIECE_SQUARE_TABLE_MID[idx] + PIECE_VALUE_MID[piece.to_index()];
-        end_game[color.to_index()] += rook_on_open_file + PIECE_SQUARE_TABLE_END[idx] + PIECE_VALUE_END[piece.to_index()];
-        phase += PIECE_PHASE[piece.to_index()];
+            rook_open_file_bonus: Weight::new(20).into(),
+            unshield_king_penalty: Weight::new(-15).into(),
+        }
     }
+}
 
-    let stm = board.side_to_move() as usize;
-    let mg_eval = mid_game[stm] - mid_game[1 - stm];
-    let eg_eval = end_game[stm] - end_game[1 - stm];
-    let mg_phase = phase.min(24);
-    let eg_phase = 24 - mg_phase;
+impl EvalParams {
+    /// Mostly PeSTO's evaluation with rook on open file bonus
+    pub fn evaluate_static(&self, board: &Board) -> Eval {
+        let mut mid_game = [Tracker::default(), Tracker::default()];
+        let mut end_game = [Tracker::default(), Tracker::default()];
+        let mut phase = 0;
 
-    Eval(((mg_eval as i32 * mg_phase as i32 + eg_eval as i32 * eg_phase as i32) / 24) as i16)
+        for square in board.combined().into_iter() {
+            // SAFETY: only squares with things on it are checked
+            let piece = unsafe { board.piece_on(square).unwrap_unchecked() };
+            let color = unsafe { board.color_on(square).unwrap_unchecked() };
+
+            let mid = &mut mid_game[color.to_index()];
+            let end = &mut end_game[color.to_index()];
+
+            // rook on open file bonus
+            let rook_on_open_file = (piece == Piece::Rook
+                && (board.pieces(Piece::Pawn) & chess::get_file(square.get_file())).0 == 0
+            ) as i16;
+            *mid += (&self.rook_open_file_bonus, rook_on_open_file);
+            *end += (&self.rook_open_file_bonus, rook_on_open_file);
+
+            // king's pawn shield penalty
+            // TODO: maybe make it a king-side dependent PST instead?
+            if piece == Piece::King {
+                let king_center = square.uforward(color);
+                let king_pawns = (board.pieces(Piece::Pawn) & (chess::get_king_moves(king_center) | BitBoard::from_square(king_center))).popcnt();
+
+                *mid += (&self.unshield_king_penalty, 3_i16.saturating_sub(king_pawns as i16));
+            }
+
+            let idx = (square.to_index() ^ (0b111_000 * (color == Color::Black) as usize)) | (piece.to_index() << 6);
+            *mid += &self.pst_mid[idx];
+            *end += &self.pst_end[idx];
+            phase += PIECE_PHASE[piece.to_index()];
+        }
+
+        let stm = board.side_to_move() as usize;
+        let mut mg_eval = mid_game[stm].clone() - mid_game[1 - stm].clone();
+        let mut eg_eval = end_game[stm].clone() - end_game[1 - stm].clone();
+        let mg_phase = phase.min(24);
+        let eg_phase = 24 - mg_phase;
+
+        let mut eval = Tracker::<i32>::default();
+        mg_eval *= mg_phase as i16;
+        eg_eval *= eg_phase as i16;
+        eval += Tracker::from(mg_eval);
+        eval += Tracker::from(eg_eval);
+        eval /= 24;
+
+        Eval(eval.value() as i16)
+    }
 }
 
 /// Finds the current phase of the game. 0 is endgame and 24 is midgame.

@@ -1,4 +1,4 @@
-pub use eval::{Eval, evaluate_static};
+pub use eval::{Eval, EvalParams};
 pub use game::Game;
 pub use see::see;
 
@@ -45,6 +45,7 @@ pub struct Engine {
 
 pub(crate) struct SmpThread<'a, const MAIN: bool = false> {
     engine: &'a Engine,
+    eval_params: EvalParams,
     index: usize,
 
     hist_table: move_order::HistoryTable,
@@ -96,6 +97,7 @@ impl Engine {
     pub(crate) fn new_thread<'a, const MAIN: bool>(&'a self, index: usize) -> SmpThread<'a, MAIN> {
         SmpThread {
             engine: self,
+            eval_params: EvalParams::default(),
             index,
 
             hist_table: move_order::ButterflyTable::new(),

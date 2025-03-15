@@ -203,7 +203,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
         // reversed futility pruning (aka: static null move)
         if !Node::PV && !in_check && depth <= 2 && !bound.beta.is_mate() {
-            let eval = evaluate_static(game.board());
+            let eval = self.eval_params.evaluate_static(game.board());
             let margin = 120 * depth as i16;
 
             if eval - margin >= bound.beta {
@@ -252,7 +252,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             && depth <= 2
             && !in_check
             && !bound.alpha.is_mate()
-            && *prev_move.static_eval + f_margin <= bound.alpha;
+            && prev_move.static_eval.get(&self.eval_params) + f_margin <= bound.alpha;
 
         let tte = self.trans_table.get(game.board().get_hash());
 
@@ -351,7 +351,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
     }
 
     fn quiescence_search(&mut self, game: &Game, mut bound: Bound) -> Eval {
-        let standing_pat = evaluate_static(game.board());
+        let standing_pat = self.eval_params.evaluate_static(game.board());
         // TODO: failing to standing pat makes sprt fail, need investigation
         if standing_pat >= bound.beta { return bound.beta; }
         bound.alpha = bound.alpha.max(standing_pat);

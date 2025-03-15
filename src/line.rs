@@ -2,7 +2,7 @@ use core::{cell::OnceCell, ops::Deref};
 
 use chess::{Board, ChessMove};
 
-use crate::{evaluate_static, Eval};
+use crate::{Eval, EvalParams};
 
 #[derive(Debug, Clone)]
 pub struct PrevMove<'a> {
@@ -28,9 +28,9 @@ impl PrevMove<'_> {
         Some(at)
     }
 
-    pub fn is_improving(&self) -> bool {
+    pub fn is_improving(&self, ep: &EvalParams) -> bool {
         self.n_plies_ago(2).map_or(true, |m| {
-            *m.static_eval < *self.static_eval
+            m.static_eval.get(ep) < self.static_eval.get(ep)
         })
     }
 }
@@ -44,10 +44,8 @@ impl<'a> EvalCell<'a> {
     }
 }
 
-impl Deref for EvalCell<'_> {
-    type Target = Eval;
-
-    fn deref(&self) -> &Self::Target {
-        self.eval.get_or_init(|| evaluate_static(self.board))
+impl EvalCell<'_> {
+    pub fn get(&self, ep: &EvalParams) -> Eval {
+        *self.eval.get_or_init(|| ep.evaluate_static(self.board))
     }
 }
