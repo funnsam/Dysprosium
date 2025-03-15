@@ -49,11 +49,12 @@ impl EvalParams {
             let end = &mut end_game[color.to_index()];
 
             // rook on open file bonus
-            let rook_on_open_file = (piece == Piece::Rook
+            if piece == Piece::Rook
                 && (board.pieces(Piece::Pawn) & chess::get_file(square.get_file())).0 == 0
-            ) as i16;
-            *mid += (&self.rook_open_file_bonus, rook_on_open_file);
-            *end += (&self.rook_open_file_bonus, rook_on_open_file);
+            {
+                *mid += &self.rook_open_file_bonus;
+                *end += &self.rook_open_file_bonus;
+            }
 
             // king's pawn shield penalty
             // TODO: maybe make it a king-side dependent PST instead?
@@ -71,16 +72,13 @@ impl EvalParams {
         }
 
         let stm = board.side_to_move() as usize;
-        let mut mg_eval = mid_game[stm].clone() - mid_game[1 - stm].clone();
-        let mut eg_eval = end_game[stm].clone() - end_game[1 - stm].clone();
+        let mg_eval = mid_game[stm].clone() - mid_game[1 - stm].clone();
+        let eg_eval = end_game[stm].clone() - end_game[1 - stm].clone();
         let mg_phase = phase.min(24);
         let eg_phase = 24 - mg_phase;
 
-        let mut eval = Tracker::<i32>::default();
-        mg_eval *= mg_phase as i16;
-        eg_eval *= eg_phase as i16;
-        eval += Tracker::from(mg_eval);
-        eval += Tracker::from(eg_eval);
+        let mut eval = Tracker::<i32>::from(mg_eval * mg_phase as i16)
+            + Tracker::from(eg_eval * eg_phase as i16);
         eval /= 24;
 
         Eval(eval.value() as i16)

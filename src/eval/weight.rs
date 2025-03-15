@@ -1,6 +1,6 @@
 use core::cell::Cell;
 use core::marker::PhantomData;
-use std::{fmt, ops::{Add, AddAssign, DivAssign, MulAssign, Sub, SubAssign}};
+use std::{fmt, ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign}};
 
 #[cfg(feature = "eval-track")]
 use arrayvec::ArrayVec;
@@ -174,6 +174,26 @@ impl<'a, T> Sub<Tracker<'a, T>> for Tracker<'a, T> where Self: SubAssign<Self> {
     #[inline]
     fn sub(mut self, rhs: Self) -> Self::Output {
         self -= rhs;
+        self
+    }
+}
+
+impl<'a, T> Mul<T> for Tracker<'a, T> where Self: MulAssign<T> {
+    type Output = Self;
+
+    #[inline]
+    fn mul(mut self, rhs: T) -> Self::Output {
+        self *= rhs;
+        self
+    }
+}
+
+impl<'a, T> Div<T> for Tracker<'a, T> where Self: DivAssign<T> {
+    type Output = Self;
+
+    #[inline]
+    fn div(mut self, rhs: T) -> Self::Output {
+        self /= rhs;
         self
     }
 }
