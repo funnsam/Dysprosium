@@ -7,10 +7,10 @@ use arrayvec::ArrayVec;
 
 #[derive(Default, Debug, Clone, PartialEq, PartialOrd)]
 pub struct Tracker<'a> {
-    pub value: i16,
+    value: i16,
     #[cfg(feature = "eval-track")]
     pub track: ArrayVec<(&'a WeightCell, f64), 256>,
-    pub _phantom: PhantomData<&'a ()>,
+    _phantom: PhantomData<&'a ()>,
 }
 
 pub type WeightCell = Cell<Weight>;
@@ -19,9 +19,9 @@ pub type WeightCell = Cell<Weight>;
 pub struct Weight {
     pub value: i16,
     #[cfg(feature = "eval-track")]
-    pub derivative: f64,
+    derivative: f64,
     #[cfg(feature = "eval-track")]
-    pub frequency: usize,
+    frequency: usize,
 }
 
 impl Weight {
@@ -34,12 +34,18 @@ impl Weight {
             frequency: 0,
         }
     }
+
+    #[cfg(feature = "eval-track")]
+    pub const fn derivative(&self) -> f64 { self.derivative }
+    #[cfg(feature = "eval-track")]
+    pub const fn frequency(&self) -> usize { self.frequency }
 }
 
 impl Tracker<'_> {
-    pub fn finalize() {
-        todo!();
-    }
+    pub fn value(&self) -> i16 { self.value }
+
+    #[cfg(feature = "eval-track")]
+    pub fn backprop(&self) {}
 }
 
 impl<'a> From<&'a WeightCell> for Tracker<'a> {
