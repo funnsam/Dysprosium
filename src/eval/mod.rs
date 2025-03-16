@@ -25,7 +25,10 @@ impl EvalParams {
         fn apply(wc: &WeightCell) {
             let mut w = wc.get();
 
-            w.value -= (w.derivative() * 20000.0 / w.frequency() as f64).round() as i16;
+            if w.frequency() != 0 {
+                w.value -= (w.derivative() * 10000.0 / w.frequency() as f64).round() as i16;
+            }
+
             w.reset_meta();
             wc.set(w);
         }
