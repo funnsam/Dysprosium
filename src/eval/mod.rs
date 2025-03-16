@@ -4,7 +4,7 @@ use weight::{Tracker, Weight, WeightCell};
 pub use eval::Eval;
 
 mod eval;
-mod weight;
+pub mod weight;
 
 #[derive(Debug, Clone)]
 pub struct EvalParams {
@@ -36,6 +36,11 @@ impl Default for EvalParams {
 impl EvalParams {
     /// Mostly PeSTO's evaluation with rook on open file bonus
     pub fn evaluate_static(&self, board: &Board) -> Eval {
+        let track = self.evaluate_static_track(board);
+        Eval(track.value() as i16)
+    }
+
+    pub fn evaluate_static_track(&self, board: &Board) -> Tracker<i32> {
         let mut mid_game = [Tracker::default(), Tracker::default()];
         let mut end_game = [Tracker::default(), Tracker::default()];
         let mut phase = 0;
@@ -81,7 +86,7 @@ impl EvalParams {
             + Tracker::from(eg_eval) * eg_phase as i32;
         eval /= 24;
 
-        Eval(eval.value() as i16)
+        eval
     }
 }
 

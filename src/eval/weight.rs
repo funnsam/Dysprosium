@@ -9,13 +9,13 @@ use arrayvec::ArrayVec;
 pub struct Tracker<'a, T> {
     value: T,
     #[cfg(feature = "eval-track")]
-    pub track: ArrayVec<(&'a WeightCell, f64), 256>,
+    track: ArrayVec<(&'a WeightCell, f64), 256>,
     _phantom: PhantomData<&'a ()>,
 }
 
 pub type WeightCell = Cell<Weight>;
 
-#[derive(Default, Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Default, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Weight {
     pub value: i16,
     #[cfg(feature = "eval-track")]
@@ -26,9 +26,27 @@ pub struct Weight {
 
 impl<T: Copy> Tracker<'_, T> {
     pub const fn value(&self) -> T { self.value }
+}
 
+impl Tracker<'_, f64> {
     #[cfg(feature = "eval-track")]
-    pub fn backprop(&self) {}
+    pub fn backprop(self, r: f64, k: f64) {
+        let y_hat = ((-k * self.value()).exp() + 1.0).recip();
+        println!("{y_hat}");
+
+        for (i, (t, m)) in self.track.iter().enumerate() {
+            if *m == 0.0 { continue };
+
+            let encountered = self.track[..i].iter().any(|i| core::ptr::eq(*t, i.0));
+            let term = t.get();
+            t.set(Weight {
+                derivative: term.derivative + 2.0 * k * m * y_hat * (y_hat - r) * (1.0 - y_hat),
+                frequency: term.frequency() + (!encountered) as usize,
+                ..term
+            });
+            println!("{m:.3} {t:?}");
+        }
+    }
 }
 
 impl<T: fmt::Debug> fmt::Debug for Tracker<'_, T> {
@@ -36,6 +54,21 @@ impl<T: fmt::Debug> fmt::Debug for Tracker<'_, T> {
         f.debug_struct("Tracker")
             .field("value", &self.value)
             .finish_non_exhaustive()
+    }
+}
+
+impl fmt::Debug for Weight {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut s = f.debug_struct("Weight");
+        s.field("w", &self.value);
+
+        #[cfg(feature = "eval-track")]
+        {
+            s.field("∂C", &self.derivative());
+            s.field("f", &self.frequency());
+        }
+
+        s.finish()
     }
 }
 
@@ -54,6 +87,14 @@ impl Weight {
     pub const fn derivative(&self) -> f64 { self.derivative }
     #[cfg(feature = "eval-track")]
     pub const fn frequency(&self) -> usize { self.frequency }
+
+    pub const fn reset_meta(&mut self) {
+        #[cfg(feature = "eval-track")]
+        {
+            self.derivative = 0.0;
+            self.frequency = 0;
+        }
+    }
 }
 
 impl<'a> From<&'a WeightCell> for Tracker<'a, i16> {
