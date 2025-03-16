@@ -52,8 +52,13 @@ fn main() {
         }
     }
 
-    let file = format!("use super::{{weight::Weight, EvalParams}};\
-        impl Default for EvalParams {{ fn default() -> Self {{ {best_ep:?} }} }}");
+    let mean_err = best_err / pos.len() as f64;
+    let file = format!("\
+// K = {k}
+// Mean error = {mean_err}
+
+use super::{{weight::Weight, EvalParams}};
+impl Default for EvalParams {{ fn default() -> Self {{ {best_ep:?} }} }}");
     write("../src/eval/tuned.rs", file).unwrap();
 }
 
