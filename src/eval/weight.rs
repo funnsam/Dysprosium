@@ -1,6 +1,6 @@
 use core::cell::Cell;
 use core::marker::PhantomData;
-use std::{fmt, ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign}};
+use std::{fmt, ops::{Add, AddAssign, Deref, Div, DivAssign, Mul, MulAssign, Sub, SubAssign}};
 
 #[cfg(feature = "eval-track")]
 use arrayvec::ArrayVec;
@@ -13,39 +13,40 @@ pub struct Tracker<'a, T> {
     _phantom: PhantomData<&'a ()>,
 }
 
-pub type WeightCell = Cell<Weight>;
+#[derive(Default, Clone, PartialEq, PartialOrd)]
+pub struct WeightCell(Cell<Weight>);
 
 #[derive(Default, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Weight {
     pub value: i16,
     #[cfg(feature = "eval-track")]
     derivative: f64,
-    #[cfg(feature = "eval-track")]
-    frequency: usize,
 }
 
 impl<T: Copy> Tracker<'_, T> {
     pub const fn value(&self) -> T { self.value }
 }
 
+pub fn sigmoid(x: f64, k: f64) -> f64 {
+    ((-k * x).exp() + 1.0).recip()
+}
+
 impl Tracker<'_, f64> {
     #[cfg(feature = "eval-track")]
-    pub fn backprop(self, r: f64, k: f64) {
-        let y_hat = ((-k * self.value()).exp() + 1.0).recip();
-        println!("{y_hat}");
+    pub fn backprop(self, r: f64, k: f64) -> f64 {
+        let y_hat = sigmoid(self.value(), k);
 
-        for (i, (t, m)) in self.track.iter().enumerate() {
+        for (t, m) in self.track.iter() {
             if *m == 0.0 { continue };
 
-            let encountered = self.track[..i].iter().any(|i| core::ptr::eq(*t, i.0));
             let term = t.get();
             t.set(Weight {
                 derivative: term.derivative + 2.0 * k * m * y_hat * (y_hat - r) * (1.0 - y_hat),
-                frequency: term.frequency() + (!encountered) as usize,
                 ..term
             });
-            println!("{m:.3} {t:?}");
         }
+
+        (r - y_hat).powi(2)
     }
 }
 
@@ -57,6 +58,26 @@ impl<T: fmt::Debug> fmt::Debug for Tracker<'_, T> {
     }
 }
 
+impl fmt::Debug for WeightCell {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Weight::new({}).into()", self.0.get().value)
+    }
+}
+
+impl From<Weight> for WeightCell {
+    fn from(value: Weight) -> Self {
+        Self(value.into())
+    }
+}
+
+impl Deref for WeightCell {
+    type Target = Cell<Weight>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 impl fmt::Debug for Weight {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = f.debug_struct("Weight");
@@ -65,7 +86,6 @@ impl fmt::Debug for Weight {
         #[cfg(feature = "eval-track")]
         {
             s.field("∂C", &self.derivative());
-            s.field("f", &self.frequency());
         }
 
         s.finish()
@@ -78,21 +98,16 @@ impl Weight {
             value,
             #[cfg(feature = "eval-track")]
             derivative: 0.0,
-            #[cfg(feature = "eval-track")]
-            frequency: 0,
         }
     }
 
     #[cfg(feature = "eval-track")]
     pub const fn derivative(&self) -> f64 { self.derivative }
-    #[cfg(feature = "eval-track")]
-    pub const fn frequency(&self) -> usize { self.frequency }
 
     pub const fn reset_meta(&mut self) {
         #[cfg(feature = "eval-track")]
         {
             self.derivative = 0.0;
-            self.frequency = 0;
         }
     }
 }

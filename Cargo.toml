@@ -16,6 +16,8 @@ parking_lot = "0.12.3"
 
 [features]
 eval-track = []
+tuned = []
+pesto = []
 
 [profile.release-debuginfo]
 inherits = "release"
