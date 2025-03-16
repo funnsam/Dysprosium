@@ -21,6 +21,8 @@ pub struct Weight {
     pub value: i16,
     #[cfg(feature = "eval-track")]
     derivative: f64,
+    #[cfg(feature = "eval-track")]
+    frequency: usize,
 }
 
 impl<T: Copy> Tracker<'_, T> {
@@ -34,14 +36,19 @@ pub fn sigmoid(x: f64, k: f64) -> f64 {
 impl Tracker<'_, f64> {
     #[cfg(feature = "eval-track")]
     pub fn backprop(self, r: f64, k: f64) -> f64 {
+        use std::ptr;
+
         let y_hat = sigmoid(self.value(), k);
 
-        for (t, m) in self.track.iter() {
+        for (i, (t, m)) in self.track.iter().enumerate() {
             if *m == 0.0 { continue };
+
+            let encountered = self.track[..i].iter().any(|i| i.1 != 0.0 && ptr::eq(i.0, *t));
 
             let term = t.get();
             t.set(Weight {
                 derivative: term.derivative + 2.0 * k * m * y_hat * (y_hat - r) * (1.0 - y_hat),
+                frequency: term.frequency() + (!encountered) as usize,
                 ..term
             });
         }
@@ -98,16 +105,21 @@ impl Weight {
             value,
             #[cfg(feature = "eval-track")]
             derivative: 0.0,
+            #[cfg(feature = "eval-track")]
+            frequency: 0,
         }
     }
 
     #[cfg(feature = "eval-track")]
     pub const fn derivative(&self) -> f64 { self.derivative }
+    #[cfg(feature = "eval-track")]
+    pub const fn frequency(&self) -> usize { self.frequency }
 
     pub const fn reset_meta(&mut self) {
         #[cfg(feature = "eval-track")]
         {
             self.derivative = 0.0;
+            self.frequency = 0;
         }
     }
 }
