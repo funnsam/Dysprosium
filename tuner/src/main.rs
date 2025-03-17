@@ -41,7 +41,7 @@ fn main() {
     let k = find_k(&ep, &pos);
     println!("K = {k}");
 
-    for i in 0..10 {
+    for i in 0..200 {
         let mut err = 0.0;
 
         for (board, res) in pos.iter() {
@@ -70,6 +70,8 @@ fn main() {
 // Mean error = {mean_err}
 
 use super::{{weight::Weight, EvalParams}};
+pub const PIECE_VALUE_MID: [i16; 6] = {piece_mid:?};
+pub const PIECE_VALUE_END: [i16; 6] = {piece_end:?};
 impl Default for EvalParams {{ fn default() -> Self {{ {best_ep:?} }} }}");
     write("../src/eval/tuned.rs", file).unwrap();
 }

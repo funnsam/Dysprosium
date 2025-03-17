@@ -3,6 +3,11 @@ use weight::{Tracker, WeightCell};
 
 pub use eval::Eval;
 
+#[cfg(feature = "tuned")]
+pub use tuned::{PIECE_VALUE_MID, PIECE_VALUE_END};
+#[cfg(feature = "pesto")]
+pub use pesto::{PIECE_VALUE_MID, PIECE_VALUE_END};
+
 mod eval;
 #[cfg(feature = "tuned")]
 mod tuned;
@@ -120,5 +125,5 @@ pub fn game_phase(board: &Board) -> u8 {
         .min(24)
 }
 
-pub const PIECE_VALUE: [i16; 6] = [82, 337, 365, 477, 1025,  0];
+pub const PIECE_VALUE: [i16; 6] = PIECE_VALUE_MID;
 const PIECE_PHASE: [u8; 6] = [0, 1, 1, 2, 4, 0];
