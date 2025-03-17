@@ -5,11 +5,13 @@ impl Default for EvalParams {
         Self {
             pst_mid: core::array::from_fn(|i| {
                 let val = PIECE_VALUE_MID[i / 64];
-                Weight::new(PIECE_SQUARE_TABLE_MID[i] + val).into()
+                Weight::new(val).into()
+                // Weight::new(PIECE_SQUARE_TABLE_MID[i] + val).into()
             }),
             pst_end: core::array::from_fn(|i| {
                 let val = PIECE_VALUE_END[i / 64];
-                Weight::new(PIECE_SQUARE_TABLE_END[i] + val).into()
+                Weight::new(val).into()
+                // Weight::new(PIECE_SQUARE_TABLE_END[i] + val).into()
             }),
 
             rook_open_file_bonus: Weight::new(0).into(),
@@ -18,8 +20,11 @@ impl Default for EvalParams {
     }
 }
 
-const PIECE_VALUE_MID: [i16; 6] = [82, 337, 365, 477, 1025,  0];
-const PIECE_VALUE_END: [i16; 6] = [94, 281, 297, 512,  936,  0];
+// const PIECE_VALUE_MID: [i16; 6] = [82, 337, 365, 477, 1025,  0];
+// const PIECE_VALUE_END: [i16; 6] = [94, 281, 297, 512,  936,  0];
+
+const PIECE_VALUE_MID: [i16; 6] = [100, 320, 330, 500, 900, 0];
+const PIECE_VALUE_END: [i16; 6] = [100, 320, 330, 500, 900, 0];
 
 // a1 ----> h1
 // |

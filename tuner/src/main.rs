@@ -34,7 +34,7 @@ fn main() {
     let k = find_k(&ep, &pos);
     println!("K = {k}");
 
-    for i in 0..200 {
+    for i in 0..10 {
         let mut err = 0.0;
 
         for (board, res) in pos.iter() {
@@ -53,6 +53,9 @@ fn main() {
     }
 
     let mean_err = best_err / pos.len() as f64;
+    let (piece_mid, piece_end) = ep.piece_values();
+    println!("{piece_mid:?} {piece_end:?}");
+
     let file = format!("\
 // K = {k}
 // Mean error = {mean_err}

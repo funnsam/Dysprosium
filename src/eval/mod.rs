@@ -37,6 +37,21 @@ impl EvalParams {
         apply(&self.unshield_king_penalty);
     }
 
+    pub fn piece_values(&self) -> ([i64; 6], [i64; 6]) {
+        fn compute(pst: &[WeightCell; 6 * 64]) -> [i64; 6] {
+            (
+                *pst.chunks_exact(64)
+                    .map(|i| i.iter().map(|j| j.get().value as i64).sum::<i64>() / 64)
+                    .collect::<arrayvec::ArrayVec<i64, 6>>()
+            ).try_into().unwrap()
+        }
+
+        (
+            compute(&self.pst_mid),
+            compute(&self.pst_end),
+        )
+    }
+
     /// Mostly PeSTO's evaluation with rook on open file bonus
     pub fn evaluate_static(&self, board: &Board) -> Eval {
         let track = self.evaluate_static_track(board);
