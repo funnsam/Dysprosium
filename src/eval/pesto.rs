@@ -23,8 +23,8 @@ impl Default for EvalParams {
 // const PIECE_VALUE_MID: [i16; 6] = [82, 337, 365, 477, 1025,  0];
 // const PIECE_VALUE_END: [i16; 6] = [94, 281, 297, 512,  936,  0];
 
-const PIECE_VALUE_MID: [i16; 6] = [100, 320, 330, 500, 900, 0];
-const PIECE_VALUE_END: [i16; 6] = [100, 320, 330, 500, 900, 0];
+pub const PIECE_VALUE_MID: [i16; 6] = [100, 320, 330, 500, 900, 0];
+pub const PIECE_VALUE_END: [i16; 6] = [100, 320, 330, 500, 900, 0];
 
 // a1 ----> h1
 // |
