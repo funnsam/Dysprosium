@@ -31,7 +31,7 @@ impl EvalParams {
             let mut w = wc.get();
 
             if w.frequency() != 0 {
-                w.value -= (w.derivative() * 10000.0 / w.frequency() as f64).round() as i16;
+                w.value -= (w.derivative() * 1500.0 / w.frequency() as f64).round() as i16;
             }
 
             w.reset_meta();

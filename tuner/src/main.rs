@@ -35,6 +35,7 @@ fn main() {
     println!("ok");
 
     let ep = EvalParams::default();
+    let mut err = 0.0;
     let mut best_ep = ep.clone();
     let mut best_err = f64::INFINITY;
 
@@ -42,7 +43,7 @@ fn main() {
     println!("K = {k}");
 
     for i in 0..200 {
-        let mut err = 0.0;
+        err = 0.0;
 
         for (board, res) in pos.iter() {
             let track = ep.evaluate_static_track(board);
@@ -50,13 +51,21 @@ fn main() {
             err += track.backprop(*res, k);
         }
 
-        ep.apply_backprop();
-        println!("{i:>3} {}", err / pos.len() as f64);
-
+        // NOTE: this is the error of the *previous* iteration!
         if err < best_err {
             best_ep = ep.clone();
             best_err = err;
+            println!("*");
         }
+
+        ep.apply_backprop();
+        println!("{i:>3} {}", err / pos.len() as f64);
+    }
+
+    if err < best_err {
+        best_ep = ep.clone();
+        best_err = err;
+        println!("*");
     }
 
     let mean_err = best_err / pos.len() as f64;
