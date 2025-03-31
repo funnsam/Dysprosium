@@ -370,16 +370,23 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
     }
 
     fn quiescence_search(&mut self, game: &Game, mut bound: Bound) -> Eval {
-        let standing_pat = evaluate_static(game.board());
-        // TODO: failing to standing pat makes sprt fail, need investigation
-        if standing_pat >= bound.beta { return bound.beta; }
-        bound.alpha = bound.alpha.max(standing_pat);
-        let mut best = standing_pat;
+        let in_check = game.board().checkers().0 != 0;
+
+        let mut best;
+        if in_check {
+            best = Eval::MIN;
+        } else {
+            let standing_pat = evaluate_static(game.board());
+            // TODO: failing to standing pat makes sprt fail, need investigation
+            if standing_pat >= bound.beta { return bound.beta; }
+            bound.alpha = bound.alpha.max(standing_pat);
+            best = standing_pat;
+        }
 
         let moves = MoveGen::new_legal(game.board());
 
         for m in moves {
-            if game.is_quiet(m) { continue };
+            if !in_check && game.is_quiet(m) { continue };
             if see(game, m) < 0 { continue };
 
             let game = game.make_move(m);
