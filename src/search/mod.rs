@@ -376,10 +376,10 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         bound.alpha = bound.alpha.max(standing_pat);
         let mut best = standing_pat;
 
-        let mut moves = MoveGen::new_legal(game.board());
-        moves.set_iterator_mask(*game.board().combined());
+        let moves = MoveGen::new_legal(game.board());
 
         for m in moves {
+            if game.is_quiet(m) { continue };
             if see(game, m) < 0 { continue };
 
             let game = game.make_move(m);
