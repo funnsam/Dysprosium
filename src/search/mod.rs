@@ -381,7 +381,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         } else {
             standing_pat = evaluate_static(game.board());
             // TODO: failing to standing pat makes sprt fail, need investigation
-            if standing_pat >= bound.beta { return bound.beta; }
+            if standing_pat >= bound.beta { return standing_pat };
             best = standing_pat;
 
             // delta pruning on hopeless nodes
