@@ -399,8 +399,8 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 if game.is_quiet(m) { continue };
 
                 // delta pruning
-                let capt = game.board().piece_on(m.get_dest()).unwrap_or(Piece::Queen);
-                if standing_pat + PIECE_VALUE[capt.to_index()] + 200 < bound.alpha { continue };
+                // let capt = game.board().piece_on(m.get_dest()).unwrap_or(Piece::Queen);
+                // if standing_pat + PIECE_VALUE[capt.to_index()] + 200 < bound.alpha { continue };
             }
 
             if see(game, m) < 0 { continue };
