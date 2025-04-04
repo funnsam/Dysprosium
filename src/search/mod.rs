@@ -419,7 +419,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 bound.alpha = bound.alpha.max(eval);
             }
             if eval >= bound.beta {
-                return eval;
+                return best;
             }
         }
 
