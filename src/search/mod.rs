@@ -66,7 +66,9 @@ impl SmpThread<'_, false> {
 
 impl<const MAIN: bool> SmpThread<'_, MAIN> {
     fn root_aspiration(&mut self, depth: usize, prev: Eval) -> (ChessMove, Eval) {
-        let mut delta = 13;
+        let (a, b,_)=self.root_search(depth, Bound::MIN_MAX);return(a,b);
+
+        let mut delta = 1000;
         let mut bound = Bound::from_window(prev, delta, delta);
 
         let (mut mov, mut eval, mut nt) = self.root_search(depth, bound);
@@ -222,7 +224,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 // return (ChessMove::default(), Eval(((eval.0 as i32 + beta.0 as i32) / 2) as i16), NodeType::None);
                 return (ChessMove::default(), eval - margin, NodeType::None);
             }
-        }
+        } 
 
         let killer = KillerTable::new();
 
@@ -237,26 +239,26 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         }
 
         // null move pruning
-        if !Node::PV && !in_check && depth >= 4 && (
-            game.board().pieces(Piece::Knight).0 != 0 ||
-            game.board().pieces(Piece::Bishop).0 != 0 ||
-            game.board().pieces(Piece::Rook).0 != 0 ||
-            game.board().pieces(Piece::Queen).0 != 0
-        ) {
-            let game = game.make_null_move().unwrap();
-            let line = PrevMove {
-                mov: prev_move.mov,
-                static_eval: EvalCell::new(game.board()),
-                prev_move: Some(prev_move),
-            };
+        // if !Node::PV && !in_check && depth >= 4 && (
+        //     game.board().pieces(Piece::Knight).0 != 0 ||
+        //     game.board().pieces(Piece::Bishop).0 != 0 ||
+        //     game.board().pieces(Piece::Rook).0 != 0 ||
+        //     game.board().pieces(Piece::Queen).0 != 0
+        // ) {
+        //     let game = game.make_null_move().unwrap();
+        //     let line = PrevMove {
+        //         mov: prev_move.mov,
+        //         static_eval: EvalCell::new(game.board()),
+        //         prev_move: Some(prev_move),
+        //     };
 
-            let r = 3 + depth / 3;
-            let eval = -self.zw_search::<Cut>(&line, &game, &killer, depth - r, ply + 1, 1 - bound.beta);
+        //     let r = 3 + depth / 3;
+        //     let eval = -self.zw_search::<Cut>(&line, &game, &killer, depth - r, ply + 1, 1 - bound.beta);
 
-            if eval >= bound.beta {
-                return (ChessMove::default(), eval.incr_mate(), NodeType::None);
-            }
-        }
+        //     if eval >= bound.beta {
+        //         return (ChessMove::default(), eval.incr_mate(), NodeType::None);
+        //     }
+        // }
 
         // check if late move pruning is applicable
         let can_lmp = !Node::PV && !in_check;
@@ -403,7 +405,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 if standing_pat + PIECE_VALUE[capt.to_index()] + 200 < bound.alpha { continue };
             }
 
-            if see(game, m) < 0 { continue };
+            // if see(game, m) < 0 { continue };
 
             let game = game.make_move(m);
             let eval = -self.quiescence_search(&game, -bound);
