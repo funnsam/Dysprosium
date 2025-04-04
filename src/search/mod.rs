@@ -196,10 +196,6 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             return (ChessMove::default(), Eval(0), NodeType::None);
         }
 
-        if depth == 0 {
-            return (ChessMove::default(), self.quiescence_search(game, bound), NodeType::None);
-        }
-
         if !Node::PV {
             if let Some(trans) = self.trans_table.get(game.board().get_hash()) {
                 let eval = trans.eval;
@@ -211,6 +207,11 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                     return (trans.next, eval, NodeType::None);
                 }
             }
+        }
+
+        if depth == 0 {
+            let (eval, nt) = self._quiescence_search(game, bound);
+            return (ChessMove::default(), eval, nt);
         }
 
         // reversed futility pruning (aka: static null move)
@@ -369,7 +370,12 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         (best.0, best.1.incr_mate(), if best.1 == bound.alpha { NodeType::All } else { NodeType::Pv })
     }
 
-    fn quiescence_search(&mut self, game: &Game, mut bound: Bound) -> Eval {
+    #[inline]
+    fn quiescence_search(&mut self, game: &Game, bound: Bound) -> Eval {
+        self._quiescence_search(game, bound).0
+    }
+
+    fn _quiescence_search(&mut self, game: &Game, mut bound: Bound) -> (Eval, NodeType) {
         let in_check = game.board().checkers().0 != 0;
 
         let mut best;
@@ -380,13 +386,12 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             best = Eval::MIN;
         } else {
             standing_pat = evaluate_static(game.board());
-            // TODO: failing to standing pat makes sprt fail, need investigation
-            if standing_pat >= bound.beta { return standing_pat };
+            if standing_pat >= bound.beta { return (standing_pat, NodeType::Cut) };
             best = standing_pat;
 
             // delta pruning on hopeless nodes
             if standing_pat + 1100 < bound.alpha {
-                return bound.alpha;
+                return (bound.alpha, NodeType::None);
             }
 
             bound.alpha = bound.alpha.max(standing_pat);
@@ -414,10 +419,10 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 bound.alpha = bound.alpha.max(eval);
             }
             if eval >= bound.beta {
-                return eval;
+                return (eval, NodeType::Cut);
             }
         }
 
-        best
+        (best, if best == bound.alpha { NodeType::All } else { NodeType::Pv })
     }
 }
