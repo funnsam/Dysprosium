@@ -241,26 +241,26 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
         // null move pruning
         // TODO: maybe issue?
-        if !Node::PV && !in_check && depth >= 4 && (
-            game.board().pieces(Piece::Knight).0 != 0 ||
-            game.board().pieces(Piece::Bishop).0 != 0 ||
-            game.board().pieces(Piece::Rook).0 != 0 ||
-            game.board().pieces(Piece::Queen).0 != 0
-        ) {
-            let game = game.make_null_move().unwrap();
-            let line = PrevMove {
-                mov: prev_move.mov,
-                static_eval: EvalCell::new(game.board()),
-                prev_move: Some(prev_move),
-            };
+        // if !Node::PV && !in_check && depth >= 4 && (
+        //     game.board().pieces(Piece::Knight).0 != 0 ||
+        //     game.board().pieces(Piece::Bishop).0 != 0 ||
+        //     game.board().pieces(Piece::Rook).0 != 0 ||
+        //     game.board().pieces(Piece::Queen).0 != 0
+        // ) {
+        //     let game = game.make_null_move().unwrap();
+        //     let line = PrevMove {
+        //         mov: prev_move.mov,
+        //         static_eval: EvalCell::new(game.board()),
+        //         prev_move: Some(prev_move),
+        //     };
 
-            let r = 3 + depth / 3;
-            let eval = -self.zw_search::<Cut>(&line, &game, &killer, depth - r, ply + 1, 1 - bound.beta);
+        //     let r = 3 + depth / 3;
+        //     let eval = -self.zw_search::<Cut>(&line, &game, &killer, depth - r, ply + 1, 1 - bound.beta);
 
-            if eval >= bound.beta {
-                return (ChessMove::default(), eval.incr_mate(), NodeType::None);
-            }
-        } 
+        //     if eval >= bound.beta {
+        //         return (ChessMove::default(), eval.incr_mate(), NodeType::None);
+        //     }
+        // } 
 
         // check if late move pruning is applicable
         let can_lmp = !Node::PV && !in_check;
