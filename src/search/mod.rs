@@ -212,8 +212,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         }
 
         if depth == 0 {
-            let (eval, nt) = self._quiescence_search(game, bound);
-            return (ChessMove::default(), eval, nt);
+            return self._quiescence_search(game, bound);
         }
 
         if !Node::PV {
@@ -380,20 +379,16 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
     #[inline]
     fn quiescence_search(&mut self, game: &Game, bound: Bound) -> Eval {
-        let (eval, nt) = self._quiescence_search(game, bound);
+        let ret = self._quiescence_search(game, bound);
 
-        self.store_tt(0, game, (ChessMove::default(), eval, nt));
-
-        eval
+        self.store_tt(0, game, ret);
+        ret.1
     }
 
-    fn _quiescence_search(&mut self, game: &Game, mut bound: Bound) -> (Eval, NodeType) {
-        if let Some(trans) = self.load_tt(0, game, bound) {
-            return (trans.eval, NodeType::None);
-        }
-
+    fn _quiescence_search(&mut self, game: &Game, mut bound: Bound) -> (ChessMove, Eval, NodeType) {
         let in_check = game.board().checkers().0 != 0;
 
+        let mut best_move = ChessMove::default();
         let mut best;
         let standing_pat;
 
@@ -403,12 +398,14 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         } else {
             standing_pat = evaluate_static(game.board());
             // TODO: failing to standing pat makes sprt fail, need investigation
-            if standing_pat >= bound.beta { return (bound.beta, NodeType::Cut) };
+            if standing_pat >= bound.beta {
+                return (best_move, bound.beta, NodeType::Cut);
+            }
             best = standing_pat;
 
             // delta pruning on hopeless nodes
             if standing_pat + 1100 < bound.alpha {
-                return (bound.alpha, NodeType::None);
+                return (best_move, bound.alpha, NodeType::None);
             }
 
             bound.alpha = bound.alpha.max(standing_pat);
@@ -433,13 +430,14 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
             if eval > best {
                 best = eval;
+                best_move = m;
                 bound.alpha = bound.alpha.max(eval);
             }
             if eval >= bound.beta {
-                return (best, NodeType::Cut);
+                return (best_move, best, NodeType::Cut);
             }
         }
 
-        (best, if best == bound.alpha { NodeType::All } else { NodeType::Pv })
+        (best_move, best, if best == bound.alpha { NodeType::All } else { NodeType::Pv })
     }
 }
