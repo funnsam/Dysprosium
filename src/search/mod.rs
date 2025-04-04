@@ -216,15 +216,15 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         // }
 
         // reversed futility pruning (aka: static null move)
-        if !Node::PV && !in_check && depth <= 2 && !bound.beta.is_mate() {
-            let eval = evaluate_static(game.board());
-            let margin = 120 * depth as i16;
+        // if !Node::PV && !in_check && depth <= 2 && !bound.beta.is_mate() {
+        //     let eval = evaluate_static(game.board());
+        //     let margin = 120 * depth as i16;
 
-            if eval - margin >= bound.beta {
-                // return (ChessMove::default(), Eval(((eval.0 as i32 + beta.0 as i32) / 2) as i16), NodeType::None);
-                return (ChessMove::default(), eval - margin, NodeType::None);
-            }
-        } 
+        //     if eval - margin >= bound.beta {
+        //         // return (ChessMove::default(), Eval(((eval.0 as i32 + beta.0 as i32) / 2) as i16), NodeType::None);
+        //         return (ChessMove::default(), eval - margin, NodeType::None);
+        //     }
+        // } 
 
         let killer = KillerTable::new();
 
@@ -275,7 +275,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         let mut moves = MoveGen::new_legal(game.board())
             .map(|m| (m, self.move_score(m, prev_move, game, &tte, &p_killer)))
             .collect::<arrayvec::ArrayVec<_, 256>>();
-        moves.sort_unstable_by_key(|i| -i.1);
+        // moves.sort_unstable_by_key(|i| -i.1);
         if ROOT && !MAIN {
             let len = moves.len();
             moves.rotate_left((self.index / 2) % len);
@@ -302,7 +302,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 prev_move: Some(prev_move),
             };
 
-            let can_reduce = depth >= 3 && !in_check && children_searched != 0;
+            let can_reduce = false&& depth >= 3 && !in_check && children_searched != 0;
 
             let mut eval = Eval(i16::MIN);
             let do_full_research = if can_reduce {
@@ -387,9 +387,9 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             best = standing_pat;
 
             // delta pruning on hopeless nodes
-            if standing_pat + 1100 < bound.alpha {
-                return bound.alpha;
-            }
+            // if standing_pat + 1100 < bound.alpha {
+            //     return bound.alpha;
+            // }
 
             bound.alpha = bound.alpha.max(standing_pat);
         }
@@ -401,8 +401,8 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 if game.is_quiet(m) { continue };
 
                 // delta pruning
-                let capt = game.board().piece_on(m.get_dest()).unwrap_or(Piece::Queen);
-                if standing_pat + PIECE_VALUE[capt.to_index()] + 200 < bound.alpha { continue };
+                // let capt = game.board().piece_on(m.get_dest()).unwrap_or(Piece::Queen);
+                // if standing_pat + PIECE_VALUE[capt.to_index()] + 200 < bound.alpha { continue };
             }
 
             // if see(game, m) < 0 { continue };
