@@ -202,18 +202,18 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             return (ChessMove::default(), self.quiescence_search(game, bound), NodeType::None);
         }
 
-        if !Node::PV {
-            if let Some(trans) = self.trans_table.get(game.board().get_hash()) {
-                let eval = trans.eval;
-                let node_type = trans.node_type();
+        // if !Node::PV {
+        //     if let Some(trans) = self.trans_table.get(game.board().get_hash()) {
+        //         let eval = trans.eval;
+        //         let node_type = trans.node_type();
 
-                if trans.depth as usize >= depth && (node_type == NodeType::Pv
-                    || (node_type == NodeType::Cut && eval >= bound.beta)
-                    || (node_type == NodeType::All && eval < bound.alpha)) {
-                    return (trans.next, eval, NodeType::None);
-                }
-            }
-        }
+        //         if trans.depth as usize >= depth && (node_type == NodeType::Pv
+        //             || (node_type == NodeType::Cut && eval >= bound.beta)
+        //             || (node_type == NodeType::All && eval < bound.alpha)) {
+        //             return (trans.next, eval, NodeType::None);
+        //         }
+        //     }
+        // }
 
         // reversed futility pruning (aka: static null move)
         if !Node::PV && !in_check && depth <= 2 && !bound.beta.is_mate() {
@@ -229,14 +229,14 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         let killer = KillerTable::new();
 
         // internal iterative reductions
-        if !ROOT && depth >= 4 && self.trans_table.get(game.board().get_hash()).is_none() {
-            let low = self._evaluate_search::<Node, ROOT>(prev_move, game, &killer, depth / 4, ply, bound, false);
-            self.store_tt(depth / 4, game, low);
+        // if !ROOT && depth >= 4 && self.trans_table.get(game.board().get_hash()).is_none() {
+        //     let low = self._evaluate_search::<Node, ROOT>(prev_move, game, &killer, depth / 4, ply, bound, false);
+        //     self.store_tt(depth / 4, game, low);
 
-            if low.1 <= bound.alpha {
-                return (low.0, low.1, NodeType::None);
-            }
-        }
+        //     if low.1 <= bound.alpha {
+        //         return (low.0, low.1, NodeType::None);
+        //     }
+        // }
 
         // null move pruning
         // if !Node::PV && !in_check && depth >= 4 && (
@@ -286,14 +286,14 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         let _game = &game;
         for (i, (m, _)) in moves.iter().copied().enumerate() {
             // apply futility pruning if we could and if this move is quiet
-            if can_f_prune && children_searched > 0 && _game.is_quiet(m) {
-                continue;
-            }
+            // if can_f_prune && children_searched > 0 && _game.is_quiet(m) {
+            //     continue;
+            // }
 
-            // apply late move pruning
-            if can_lmp && children_searched >= lmp_threshold && _game.is_quiet(m) {
-                continue;
-            }
+            // // apply late move pruning
+            // if can_lmp && children_searched >= lmp_threshold && _game.is_quiet(m) {
+            //     continue;
+            // }
 
             let game = _game.make_move(m);
             let line = PrevMove {
