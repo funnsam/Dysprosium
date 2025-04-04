@@ -153,6 +153,21 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         eval
     }
 
+    fn load_tt(&self, depth: usize, game: &Game, bound: Bound) -> Option<TransTableEntry> {
+        if let Some(trans) = self.trans_table.get(game.board().get_hash()) {
+            let eval = trans.eval;
+            let node_type = trans.node_type();
+
+            if trans.depth as usize >= depth && (node_type == NodeType::Pv
+                || (node_type == NodeType::Cut && eval >= bound.beta)
+                || (node_type == NodeType::All && eval < bound.alpha)) {
+                return Some(trans);
+            }
+        }
+
+        None
+    }
+
     fn store_tt(&self, depth: usize, game: &Game, (next, eval, nt): (ChessMove, Eval, NodeType)) {
         if nt != NodeType::None && !self.abort() {
             if let Some(tte) = self.trans_table.get_place(game.board().get_hash()) {
@@ -196,22 +211,15 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             return (ChessMove::default(), Eval(0), NodeType::None);
         }
 
-        if !Node::PV {
-            if let Some(trans) = self.trans_table.get(game.board().get_hash()) {
-                let eval = trans.eval;
-                let node_type = trans.node_type();
-
-                if trans.depth as usize >= depth && (node_type == NodeType::Pv
-                    || (node_type == NodeType::Cut && eval >= bound.beta)
-                    || (node_type == NodeType::All && eval < bound.alpha)) {
-                    return (trans.next, eval, NodeType::None);
-                }
-            }
-        }
-
         if depth == 0 {
             let (eval, nt) = self._quiescence_search(game, bound);
             return (ChessMove::default(), eval, nt);
+        }
+
+        if !Node::PV {
+            if let Some(trans) = self.load_tt(depth, game, bound) {
+                return (trans.next, trans.eval, NodeType::None);
+            }
         }
 
         // reversed futility pruning (aka: static null move)
@@ -372,10 +380,18 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
     #[inline]
     fn quiescence_search(&mut self, game: &Game, bound: Bound) -> Eval {
-        self._quiescence_search(game, bound).0
+        let (eval, nt) = self._quiescence_search(game, bound);
+
+        self.store_tt(0, game, (ChessMove::default(), eval, nt));
+
+        eval
     }
 
     fn _quiescence_search(&mut self, game: &Game, mut bound: Bound) -> (Eval, NodeType) {
+        if let Some(trans) = self.load_tt(0, game, bound) {
+            return (trans.eval, NodeType::None);
+        }
+
         let in_check = game.board().checkers().0 != 0;
 
         let mut best;
