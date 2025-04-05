@@ -75,14 +75,22 @@ impl<const MAIN: bool> crate::SmpThread<'_, MAIN> {
 
         if tte.is_some_and(|tte| tte.next == m) {
             i32::MAX
-        } else if game.is_capture(m) {
+        } else if cfg!(feature = "moveord-mvv") && game.is_capture(m) {
             mvv_lva(game, m) as i32 * 327601
         } else {
+            #[cfg(feature = "moveord-cmove")]
             if self.countermove[prev_move.mov] == m {
                 return 327600;
             }
 
-            self.hist_table[m] as i32 + killer[m] as i32 * 100
+            let hist = if cfg!(feature = "moveord-hist") {
+                self.hist_table[m] as i32
+            } else { 0 };
+            let killer = if cfg!(feature = "moveord-killer") {
+                killer[m] as i32 * 100
+            } else { 0 };
+
+            hist + killer
         }
     }
 }
