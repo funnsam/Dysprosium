@@ -273,7 +273,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         let mut moves = MoveGen::new_legal(game.board())
             .map(|m| (m, self.move_score(m, prev_move, game, &tte, &p_killer)))
             .collect::<arrayvec::ArrayVec<_, 256>>();
-        moves.sort_unstable_by_key(|i| -i.1);
+        // moves.sort_unstable_by_key(|i| -i.1);
         if ROOT && !MAIN {
             let len = moves.len();
             moves.rotate_left((self.index / 2) % len);
