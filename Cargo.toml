@@ -14,6 +14,46 @@ fastrand = "2.3.0"
 fxhash = "0.2.1"
 parking_lot = "0.12.3"
 
+[features]
+default = ["moveord-all", "search-all", "qs-all"]
+
+moveord-all = [
+    "moveord-cmove",
+    "moveord-hist",
+    "moveord-killer",
+    "moveord-mvv",
+]
+moveord-cmove = []
+moveord-hist = []
+moveord-killer = []
+moveord-mvv = []
+
+search-all = [
+    "search-fp",
+    "search-iir",
+    "search-lmp",
+    "search-lmr",
+    "search-nmp",
+    "search-rfp",
+    "search-ttc",
+]
+search-fp = []
+search-iir = []
+search-lmp = []
+search-lmr = []
+search-nmp = []
+search-rfp = []
+search-ttc = []
+
+qs-all = [
+    "qs-big-delta",
+    "qs-delta",
+    "qs-see",
+]
+qs-big-delta = []
+qs-delta = []
+qs-see = []
+
 [profile.release-debuginfo]
 inherits = "release"
 debug = true

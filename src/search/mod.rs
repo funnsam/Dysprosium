@@ -200,6 +200,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             return (ChessMove::default(), self.quiescence_search(game, bound), NodeType::None);
         }
 
+        #[cfg(feature = "search-ttc")]
         if !Node::PV {
             if let Some(trans) = self.trans_table.get(game.board().get_hash()) {
                 let eval = trans.eval;
@@ -214,6 +215,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         }
 
         // reversed futility pruning (aka: static null move)
+        #[cfg(feature = "search-rfp")]
         if !Node::PV && !in_check && depth <= 2 && !bound.beta.is_mate() {
             let eval = evaluate_static(game.board());
             let margin = 120 * depth as i16;
@@ -227,6 +229,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         let killer = KillerTable::new();
 
         // internal iterative reductions
+        #[cfg(feature = "search-iir")]
         if !ROOT && depth >= 4 && self.trans_table.get(game.board().get_hash()).is_none() {
             let low = self._evaluate_search::<Node, ROOT>(prev_move, game, &killer, depth / 4, ply, bound, false);
             self.store_tt(depth / 4, game, low);
@@ -237,6 +240,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         }
 
         // null move pruning
+        #[cfg(feature = "search-nmp")]
         if !Node::PV && !in_check && depth >= 4 && (
             game.board().pieces(Piece::Knight).0 != 0 ||
             game.board().pieces(Piece::Bishop).0 != 0 ||
@@ -284,11 +288,13 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         let _game = &game;
         for (i, (m, _)) in moves.iter().copied().enumerate() {
             // apply futility pruning if we could and if this move is quiet
+            #[cfg(feature = "search-fp")]
             if can_f_prune && children_searched > 0 && _game.is_quiet(m) {
                 continue;
             }
 
             // apply late move pruning
+            #[cfg(feature = "search-lmp")]
             if can_lmp && children_searched >= lmp_threshold && _game.is_quiet(m) {
                 continue;
             }
@@ -300,7 +306,8 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 prev_move: Some(prev_move),
             };
 
-            let can_reduce = depth >= 3 && !in_check && children_searched != 0;
+            let can_reduce = cfg!(feature = "search-lmr")
+                && depth >= 3 && !in_check && children_searched != 0;
 
             let mut eval = Eval(i16::MIN);
             let do_full_research = if can_reduce {
@@ -385,6 +392,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             best = standing_pat;
 
             // delta pruning on hopeless nodes
+            #[cfg(feature = "qs-big-delta")]
             if standing_pat + 1100 < bound.alpha {
                 return bound.alpha;
             }
@@ -400,9 +408,11 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
                 // delta pruning
                 let capt = game.board().piece_on(m.get_dest()).unwrap_or(Piece::Queen);
+                #[cfg(feature = "qs-delta")]
                 if standing_pat + PIECE_VALUE[capt.to_index()] + 200 < bound.alpha { continue };
             }
 
+            #[cfg(feature = "qs-see")]
             if see(game, m) < 0 { continue };
 
             let game = game.make_move(m);
