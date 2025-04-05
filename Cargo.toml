@@ -18,8 +18,8 @@ parking_lot = "0.12.3"
 default = ["moveord-all", "search-all", "qs-all"]
 
 moveord-all = [
-    "moveord-cmove",
-    # "moveord-hist",
+    # "moveord-cmove",
+    "moveord-hist",
     "moveord-killer",
     "moveord-mvv",
 ]
