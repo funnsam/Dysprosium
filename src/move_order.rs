@@ -76,7 +76,7 @@ impl<const MAIN: bool> crate::SmpThread<'_, MAIN> {
         if cfg!(feature = "moveord-hash") && tte.is_some_and(|tte| tte.next == m) {
             i32::MAX
         } else if cfg!(feature = "moveord-mvv") && game.is_capture(m) {
-            mvv_lva(game, m) as i32 * 327601
+            mvv_lva(game, m) as i32 * -327601
         } else {
             #[cfg(feature = "moveord-cmove")]
             if self.countermove[prev_move.mov] == m {
