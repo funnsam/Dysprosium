@@ -354,13 +354,6 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 if !_game.is_capture(m) {
                     let bonus = 300 * depth as isize - 250;
 
-                    for (m, _) in moves[..i].into_iter() {
-                        if !_game.is_capture(*m) {
-                            self.hist_table.update(*m, -bonus);
-                            p_killer.update(*m, -bonus);
-                        }
-                    }
-
                     self.hist_table.update(m, bonus);
                     p_killer.update(m, bonus);
 
