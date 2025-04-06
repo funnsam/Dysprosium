@@ -318,7 +318,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 let mut r = ln_depth * ln_nodes * 0.4 + 2.78;
                 r -= Node::PV as u8 as f32;
                 r -= line.is_improving() as u8 as f32;
-                let r = (r as usize).max(1).min(depth);
+                let r = (r.round() as usize).max(1).min(depth);
 
                 eval = -self.zw_search::<Node::Zw>(&line, &game, &killer, depth - r, ply + 1, -bound.alpha);
 
