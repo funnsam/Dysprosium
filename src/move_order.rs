@@ -73,7 +73,7 @@ impl<const MAIN: bool> crate::SmpThread<'_, MAIN> {
         killer: &KillerTable,
     ) -> i32 {
 
-        if tte.is_some_and(|tte| tte.next == m) {
+        if cfg!(feature = "moveord-hash") && tte.is_some_and(|tte| tte.next == m) {
             i32::MAX
         } else if cfg!(feature = "moveord-mvv") && game.is_capture(m) {
             mvv_lva(game, m) as i32 * 327601
