@@ -116,5 +116,5 @@ fn mvv_lva(game: &Game, m: ChessMove) -> i16 {
     let victim = game.board().piece_on(m.get_dest()).map_or(5, |p| p.to_index());
     let aggressor = game.board().piece_on(m.get_source()).unwrap().to_index();
 
-    MVV_LVA[victim][aggressor]
+    MVV_LVA[aggressor][victim]
 }
