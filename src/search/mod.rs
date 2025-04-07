@@ -217,7 +217,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
         // reversed futility pruning (aka: static null move)
         #[cfg(feature = "search-rfp")]
-        if !Node::PV && !in_check && depth <= 2 && !bound.beta.is_mate() {
+        if !Node::PV && !in_check && depth <= 2 && !bound.is_mate() {
             let eval = evaluate_static(game.board());
             let margin = 120 * depth as i16;
 
@@ -271,6 +271,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         let f_margin = 150 * depth as i16;
         let can_f_prune = can_lmp
             && depth <= 2
+            && !bound.is_mate()
             && *prev_move.static_eval + f_margin <= bound.alpha;
 
         let tte = self.trans_table.get(game.board().get_hash());
