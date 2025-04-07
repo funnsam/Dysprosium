@@ -395,19 +395,23 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
         let mut best;
         let standing_pat;
+        let pieces;
 
         if in_check {
             standing_pat = Eval::MIN;
             best = Eval::MIN;
+            pieces = u32::MAX;
         } else {
             standing_pat = evaluate_static(game.board());
             // TODO: failing to standing pat makes sprt fail, need investigation
             if standing_pat >= bound.beta { return (bound.beta, NodeType::Cut) };
             best = standing_pat;
 
+            pieces = game.board().combined().popcnt();
+
             // delta pruning on hopeless nodes
             #[cfg(feature = "qs-big-delta")]
-            if standing_pat + 1100 < bound.alpha {
+            if standing_pat + 1100 < bound.alpha && pieces > 6 {
                 return (bound.alpha, NodeType::None);
             }
 
@@ -421,9 +425,14 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 if game.is_quiet(m) { continue };
 
                 // delta pruning
-                let capt = game.board().piece_on(m.get_dest()).unwrap_or(Piece::Queen);
                 #[cfg(feature = "qs-delta")]
-                if standing_pat + PIECE_VALUE[capt.to_index()] + 200 < bound.alpha { continue };
+                if pieces > 5 {
+                    let capt = game.board().piece_on(m.get_dest()).unwrap_or(Piece::Queen);
+
+                    if standing_pat + PIECE_VALUE[capt.to_index()] + 200 < bound.alpha {
+                        continue;
+                    }
+                }
             }
 
             #[cfg(feature = "qs-see")]
