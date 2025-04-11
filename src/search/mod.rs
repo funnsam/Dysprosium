@@ -315,7 +315,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 let ln_depth = (depth as f32).ln();
                 let ln_nodes = ((children_searched + 1) as f32).ln();
 
-                let mut r = ln_depth * ln_nodes * 0.4 + 2.78;
+                let mut r = ln_depth * ln_nodes * 2.0 + 0.0;
                 r -= Node::PV as u8 as f32;
                 r -= line.is_improving() as u8 as f32;
                 let r = (r.round() as usize).max(1).min(depth);
