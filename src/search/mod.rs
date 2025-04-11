@@ -313,7 +313,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             let mut eval = Eval(i16::MIN);
             let do_full_research = if can_reduce {
                 let ln_depth = (depth as f32).ln();
-                let ln_nodes = ((children_searched + 1) as f32).ln();
+                let ln_nodes = (children_searched as f32).ln();
 
                 let mut r = ln_depth * ln_nodes * 0.4 + 2.78;
                 r -= Node::PV as u8 as f32;
