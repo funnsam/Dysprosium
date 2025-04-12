@@ -2,13 +2,14 @@ use std::{str::FromStr, time::{Duration, Instant}};
 
 use crate::*;
 
-use dysprosium::Engine;
+use dysprosium::{Engine, SearchParams};
 
 fn print_uci_info() {
     println!("id name dysprosium v{VERSION}");
     println!("id author funnsam");
     println!("option name Hash type spin default {DEFAULT_HASH_SIZE_MB} min 1 max 16384");
     println!("option name Threads type spin default {DEFAULT_THREADS} min 1 max 256");
+    print!("{}", SearchParams::UCI_OPTIONS);
 }
 
 pub struct State {
@@ -39,7 +40,7 @@ impl State {
                     self.engine.kill_smp();
                     self.engine.start_smp(value.unwrap().parse::<usize>().unwrap() - 1);
                 },
-                _ => println!("info string got invalid setoption"),
+                _ => self.engine.sparams.exec_setoption(name, value),
             },
             Some(uci::UciCommand::Debug(d)) => self.debug_mode = d,
             Some(uci::UciCommand::IsReady) => println!("readyok"),
@@ -85,6 +86,10 @@ impl State {
                 evaluate_static(self.engine.game.read().board()),
             ),
             Some(uci::UciCommand::Bench) => self.bench(),
+            Some(uci::UciCommand::Dump(item)) => match item {
+                "spsa" => print!("{}", SearchParams::SPSA),
+                _ => {},
+            },
             None => {},
         }
     }

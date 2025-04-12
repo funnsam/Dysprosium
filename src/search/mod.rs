@@ -7,6 +7,7 @@ use move_order::KillerTable;
 use node::{Cut, NodeType, Pv};
 
 mod bound;
+pub mod params;
 
 impl Engine {
     pub fn best_move<F: FnMut(&Self, (ChessMove, Eval, usize)) -> bool>(&mut self, mut cont: F) -> (ChessMove, Eval, usize) {
@@ -66,7 +67,7 @@ impl SmpThread<'_, false> {
 
 impl<const MAIN: bool> SmpThread<'_, MAIN> {
     fn root_aspiration(&mut self, depth: usize, prev: Eval) -> (ChessMove, Eval) {
-        let mut delta = 13;
+        let mut delta = self.sparams.asp_init_delta;
         let mut bound = Bound::from_window(prev, delta, delta);
 
         let (mut mov, mut eval, mut nt) = self.root_search(depth, bound);
@@ -217,9 +218,13 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
         // reversed futility pruning (aka: static null move)
         #[cfg(feature = "search-rfp")]
-        if !Node::PV && !in_check && depth <= 2 && !bound.beta.is_mate() {
+        if !Node::PV
+            && !in_check
+            && depth <= self.sparams.rfp_ubound as _
+            && !bound.beta.is_mate()
+        {
             let eval = evaluate_static(game.board());
-            let margin = 120 * depth as i16;
+            let margin = self.sparams.rfp_margin_coeff * depth as i16;
 
             if eval - margin >= bound.beta {
                 // return (ChessMove::default(), Eval(((eval.0 as i32 + beta.0 as i32) / 2) as i16), NodeType::None);
@@ -268,9 +273,9 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         let lmp_threshold = 4 + 2 * depth * depth;
 
         // check if futility pruning is applicable
-        let f_margin = 150 * depth as i16;
+        let f_margin = self.sparams.fp_margin_coeff * depth as i16;
         let can_f_prune = can_lmp
-            && depth <= 2
+            && depth <= self.sparams.fp_ubound as _
             && *prev_move.static_eval + f_margin <= bound.alpha;
 
         let tte = self.trans_table.get(game.board().get_hash());
@@ -315,9 +320,9 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 let ln_depth = (depth as f32).ln();
                 let ln_nodes = ((children_searched + 1) as f32).ln();
 
-                let mut r = ln_depth * ln_nodes * 0.4 + 2.78;
-                r -= Node::PV as u8 as f32;
-                r -= line.is_improving() as u8 as f32;
+                let mut r = ln_depth * ln_nodes * self.sparams.lmr_coeff + self.sparams.lmr_const;
+                r -= Node::PV as u8 as f32 * self.sparams.lmr_pv;
+                r -= line.is_improving() as u8 as f32 * self.sparams.lmr_improv;
                 let r = (r.round() as usize).max(1).min(depth);
 
                 eval = -self.zw_search::<Node::Zw>(&line, &game, &killer, depth - r, ply + 1, -bound.alpha);
@@ -361,7 +366,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
             if eval >= bound.beta {
                 if !_game.is_capture(m) {
-                    let bonus = 300 * depth as isize - 250;
+                    let bonus = self.sparams.hist_bonus_coeff as isize * depth as isize + self.sparams.hist_bonus_const as isize;
 
                     for (m, _) in moves[..i].into_iter() {
                         if !_game.is_capture(*m) {
@@ -407,7 +412,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
             // delta pruning on hopeless nodes
             #[cfg(feature = "qs-big-delta")]
-            if standing_pat + 1100 < bound.alpha {
+            if standing_pat + self.sparams.dp_big_delta < bound.alpha {
                 return (bound.alpha, NodeType::None);
             }
 
@@ -422,8 +427,10 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
                 // delta pruning
                 let capt = game.board().piece_on(m.get_dest()).unwrap_or(Piece::Queen);
+                let ubound = standing_pat + PIECE_VALUE[capt.to_index()] + self.sparams.dp_delta;
+
                 #[cfg(feature = "qs-delta")]
-                if standing_pat + PIECE_VALUE[capt.to_index()] + 200 < bound.alpha { continue };
+                if ubound < bound.alpha { continue };
             }
 
             #[cfg(feature = "qs-see")]
