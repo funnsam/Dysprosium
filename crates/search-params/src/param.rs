@@ -11,7 +11,7 @@ pub static PARAMS: &[Param] = &[
         name: "rfp_ubound",
         typ: Type::Int,
         default: 2.0,
-        bound: 2.0..16.0,
+        bound: 1.0..16.0,
     },
     Param {
         name: "rfp_margin_coeff",
@@ -23,7 +23,7 @@ pub static PARAMS: &[Param] = &[
         name: "fp_ubound",
         typ: Type::Int,
         default: 2.0,
-        bound: 1.0..16.0,
+        bound: 2.0..16.0,
     },
     Param {
         name: "fp_margin_coeff",
@@ -59,19 +59,19 @@ pub static PARAMS: &[Param] = &[
         name: "hist_bonus_coeff",
         typ: Type::Int,
         default: 300.0,
-        bound: 10.0..1000.0,
+        bound: 10.0..650.0,
     },
     Param {
         name: "hist_bonus_const",
         typ: Type::Int,
         default: -250.0,
-        bound: -1000.0..-10.0,
+        bound: -650.0..-10.0,
     },
     Param {
         name: "dp_big_delta",
         typ: Type::Int,
         default: 1100.0,
-        bound: 500.0..4000.0,
+        bound: 700.0..2000.0,
     },
     Param {
         name: "dp_delta",
@@ -93,7 +93,10 @@ impl Param {
     pub fn c_end(&self) -> f64 {
         let diff = self.bound.end - self.bound.start;
 
-        (diff / 20.0).max(if self.typ == Type::Int { 0.5 } else { 0.0 })
+        (diff / 20.0)
+            .abs()
+            .max(if self.typ == Type::Int { 0.5 } else { 0.0 })
+            .min(25.0)
     }
 
     pub fn write_spsa(&self, s: &mut String) {
