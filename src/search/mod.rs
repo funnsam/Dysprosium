@@ -175,7 +175,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         prev_move: &PrevMove,
         game: &Game,
         p_killer: &KillerTable,
-        depth: usize,
+        mut depth: usize,
         ply: usize,
         mut bound: Bound,
         in_zw: bool,
@@ -283,6 +283,9 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             let len = moves.len();
             moves.rotate_left((self.index / 2) % len);
         }
+
+        // one reply extension
+        depth += (!ROOT && moves.len() == 1 && ply < 30) as usize;
 
         let mut best = (ChessMove::default(), Eval::MIN);
         let mut children_searched = 0;
