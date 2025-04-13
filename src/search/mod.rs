@@ -382,7 +382,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             children_searched += 1;
         }
 
-        (best.0, best.1.incr_mate(), if best.1 == bound.alpha { NodeType::All } else { NodeType::Pv })
+        (best.0, best.1.incr_mate(), if best.1 != bound.alpha { NodeType::All } else { NodeType::Pv })
     }
 
     #[inline]
@@ -442,6 +442,6 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             }
         }
 
-        (best, if best == bound.alpha { NodeType::All } else { NodeType::Pv })
+        (best, if best != bound.alpha { NodeType::All } else { NodeType::Pv })
     }
 }
