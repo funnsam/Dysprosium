@@ -197,9 +197,11 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             return (ChessMove::default(), Eval(0), NodeType::None);
         }
 
+        let tte = self.trans_table.get(game.board().get_hash());
+
         #[cfg(feature = "search-ttc")]
         if !Node::PV {
-            if let Some(trans) = self.trans_table.get(game.board().get_hash()) {
+            if let Some(trans) = tte {
                 let eval = trans.eval;
                 let node_type = trans.node_type();
 
@@ -236,7 +238,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
         // internal iterative reductions
         #[cfg(feature = "search-iir")]
-        if !ROOT && depth >= 4 && self.trans_table.get(game.board().get_hash()).is_none() {
+        if !ROOT && depth >= 4 && tte.is_none() {
             let low = self._evaluate_search::<Node, ROOT>(prev_move, game, &killer, depth / 4, ply, bound, false);
             self.store_tt(depth / 4, game, low);
 
@@ -277,8 +279,6 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         let can_f_prune = can_lmp
             && depth <= self.sparams.fp_ubound as _
             && *prev_move.static_eval + f_margin <= bound.alpha;
-
-        let tte = self.trans_table.get(game.board().get_hash());
 
         let mut moves = MoveGen::new_legal(game.board())
             .map(|m| (m, self.move_score(m, prev_move, game, &tte, &p_killer)))
