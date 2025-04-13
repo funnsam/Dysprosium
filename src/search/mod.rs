@@ -175,12 +175,17 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         prev_move: &PrevMove,
         game: &Game,
         p_killer: &KillerTable,
-        depth: usize,
+        mut depth: usize,
         ply: usize,
         mut bound: Bound,
         in_zw: bool,
     ) -> (ChessMove, Eval, NodeType) {
         let in_check = game.board().checkers().0 != 0;
+
+        // check extension
+        #[cfg(feature = "ext-check")] {
+            depth += in_check as usize;
+        }
 
         if game.can_declare_draw() {
             return (ChessMove::default(), Eval(0), NodeType::None);

@@ -31,6 +31,7 @@ moveord-killer = []
 moveord-mvv = []
 
 search-all = [
+    "ext-all",
     "search-fp",
     "search-iir",
     "search-lmp",
@@ -46,6 +47,11 @@ search-lmr = []
 search-nmp = []
 search-rfp = []
 search-ttc = []
+
+ext-all = [
+    "ext-check",
+]
+ext-check = []
 
 qs-all = [
     "qs-big-delta",
