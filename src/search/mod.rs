@@ -7,6 +7,7 @@ use move_order::KillerTable;
 use node::{Cut, NodeType, Pv};
 
 mod bound;
+mod quisecence;
 
 impl Engine {
     pub fn best_move<F: FnMut(&Self, (ChessMove, Eval, usize)) -> bool>(&mut self, mut cont: F) -> (ChessMove, Eval, usize) {
@@ -383,65 +384,5 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         }
 
         (best.0, best.1.incr_mate(), if best.1 == bound.alpha { NodeType::All } else { NodeType::Pv })
-    }
-
-    #[inline]
-    fn quiescence_search(&mut self, game: &Game, bound: Bound) -> Eval {
-        self._quiescence_search(game, bound).0
-    }
-
-    fn _quiescence_search(&mut self, game: &Game, mut bound: Bound) -> (Eval, NodeType) {
-        let in_check = game.board().checkers().0 != 0;
-
-        let mut best;
-        let standing_pat;
-
-        if in_check {
-            standing_pat = Eval::MIN;
-            best = Eval::MIN;
-        } else {
-            standing_pat = evaluate_static(game.board());
-            // TODO: failing to standing pat makes sprt fail, need investigation
-            if standing_pat >= bound.beta { return (bound.beta, NodeType::Cut) };
-            best = standing_pat;
-
-            // delta pruning on hopeless nodes
-            #[cfg(feature = "qs-big-delta")]
-            if standing_pat + 1100 < bound.alpha {
-                return (bound.alpha, NodeType::None);
-            }
-
-            bound.alpha = bound.alpha.max(standing_pat);
-        }
-
-        let moves = MoveGen::new_legal(game.board());
-
-        for m in moves {
-            if !in_check {
-                if game.is_quiet(m) { continue };
-
-                // delta pruning
-                let capt = game.board().piece_on(m.get_dest()).unwrap_or(Piece::Queen);
-                #[cfg(feature = "qs-delta")]
-                if standing_pat + PIECE_VALUE[capt.to_index()] + 200 < bound.alpha { continue };
-            }
-
-            #[cfg(feature = "qs-see")]
-            if see(game, m) < 0 { continue };
-
-            let game = game.make_move(m);
-            let eval = -self.quiescence_search(&game, -bound);
-            self.nodes_searched += 1;
-
-            if eval > best {
-                best = eval;
-                bound.alpha = bound.alpha.max(eval);
-            }
-            if eval >= bound.beta {
-                return (best, NodeType::Cut);
-            }
-        }
-
-        (best, if best == bound.alpha { NodeType::All } else { NodeType::Pv })
     }
 }
