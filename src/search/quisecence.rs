@@ -57,6 +57,6 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             }
         }
 
-        (best, if best == bound.alpha { NodeType::All } else { NodeType::Pv })
+        (best, if best != bound.alpha { NodeType::All } else { NodeType::Pv })
     }
 }
