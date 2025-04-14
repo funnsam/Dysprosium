@@ -31,12 +31,12 @@ moveord-killer = []
 moveord-mvv = []
 
 search-all = [
-    "search-fp",
-    "search-iir",
-    "search-lmp",
-    "search-lmr",
-    "search-nmp",
-    "search-rfp",
+    # "search-fp",
+    # "search-iir",
+    # "search-lmp",
+    # "search-lmr",
+    # "search-nmp",
+    # "search-rfp",
     # "search-ttc",
 ]
 search-fp = []
@@ -48,9 +48,9 @@ search-rfp = []
 search-ttc = []
 
 qs-all = [
-    "qs-big-delta",
-    "qs-delta",
-    "qs-see",
+    # "qs-big-delta",
+    # "qs-delta",
+    # "qs-see",
 ]
 qs-big-delta = []
 qs-delta = []
