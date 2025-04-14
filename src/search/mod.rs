@@ -203,8 +203,8 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 let node_type = trans.node_type();
 
                 if trans.depth as usize >= depth && (node_type == NodeType::Pv
-                    || (node_type == NodeType::Cut && eval >= bound.beta)
-                    || (node_type == NodeType::All && eval < bound.alpha)) {
+                    || (node_type == NodeType::All && eval >= bound.beta)
+                    || (node_type == NodeType::Cut && eval < bound.alpha)) {
                     return (trans.next, eval, NodeType::None);
                 }
             }
