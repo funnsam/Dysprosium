@@ -19,7 +19,7 @@ default = ["moveord-all", "search-all", "qs-all"]
 
 moveord-all = [
     # "moveord-cmove",
-    # "moveord-hash",
+    "moveord-hash",
     # "moveord-hist",
     # "moveord-killer",
     # "moveord-mvv",
@@ -37,7 +37,7 @@ search-all = [
     # "search-lmr",
     # "search-nmp",
     # "search-rfp",
-    # "search-ttc",
+    "search-ttc",
 ]
 search-fp = []
 search-iir = []
