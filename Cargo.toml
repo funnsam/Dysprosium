@@ -35,7 +35,7 @@ search-all = [
     # "search-iir",
     # "search-lmp",
     "search-lmr",
-    "search-nmp",
+    # "search-nmp",
     "search-rfp",
     "search-ttc",
 ]
