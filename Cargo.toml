@@ -31,10 +31,10 @@ moveord-killer = []
 moveord-mvv = []
 
 search-all = [
-    "search-fp",
+    # "search-fp",
     # "search-iir",
     "search-lmp",
-    "search-lmr",
+    # "search-lmr",
     # "search-nmp",
     "search-rfp",
     "search-ttc",
