@@ -48,8 +48,8 @@ search-rfp = []
 search-ttc = []
 
 qs-all = [
-    "qs-big-delta",
-    # "qs-delta",
+    # "qs-big-delta",
+    "qs-delta",
     # "qs-see",
 ]
 qs-big-delta = []
