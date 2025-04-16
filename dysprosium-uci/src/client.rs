@@ -167,7 +167,7 @@ impl State {
 
         for fen in TEST_FENS {
             *self.engine.game.write() = Game::from_str(fen).unwrap();
-            self.engine.best_move(|_, (_, _, depth)| depth < 6);
+            self.engine.best_move(|_, (_, _, depth)| depth < 4);
 
             nodes += self.engine.nodes();
         }
