@@ -49,7 +49,7 @@ search-ttc = []
 
 qs-all = [
     "qs-big-delta",
-    "qs-delta",
+    # "qs-delta",
     # "qs-see",
 ]
 qs-big-delta = []
