@@ -22,7 +22,7 @@ moveord-all = [
     # "moveord-hash",
     # "moveord-hist",
     # "moveord-killer",
-    # "moveord-mvv",
+    "moveord-mvv",
 ]
 moveord-cmove = []
 moveord-hash = []
@@ -49,7 +49,7 @@ search-ttc = []
 
 qs-all = [
     # "qs-big-delta",
-    "qs-delta",
+    # "qs-delta",
     # "qs-see",
 ]
 qs-big-delta = []
