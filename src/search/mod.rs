@@ -6,6 +6,7 @@ use chess::{BoardStatus, ChessMove, MoveGen};
 use node::{NodeType, Pv};
 
 mod bound;
+pub mod params;
 
 impl Engine {
     pub fn best_move<F: FnMut(&Self, (ChessMove, Eval, usize)) -> bool>(&mut self, mut cont: F) -> (ChessMove, Eval, usize) {

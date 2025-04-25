@@ -1,4 +1,5 @@
 pub use eval::{Eval, evaluate_static};
+pub use search::params::SearchParams;
 pub use game::Game;
 pub use see::see;
 
@@ -33,6 +34,8 @@ pub struct Engine {
 
     debug: debug::DebugStats,
 
+    pub sparams: SearchParams,
+
     smp_prev: Mutex<Eval>,
     smp_start: Condvar,
     smp_abort: CondBarrier,
@@ -61,6 +64,8 @@ impl Engine {
             can_time_out: AtomicBool::new(true),
 
             debug: debug::DebugStats::default(),
+
+            sparams: SearchParams::default(),
 
             smp_prev: Mutex::new(Eval(0)),
             smp_start: Condvar::new(),

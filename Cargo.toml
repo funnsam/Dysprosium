@@ -1,5 +1,5 @@
 [workspace]
-members = ["dysprosium-lichess","dysprosium-uci"]
+members = ["crates/search-params","dysprosium-lichess","dysprosium-uci"]
 
 [package]
 name = "dysprosium"
@@ -81,6 +81,9 @@ opt-level = 3
 opt-level = 3
 [profile.test.build-override]
 opt-level = 3
+
+[build-dependencies]
+search-params = { version = "0.1.0", path = "crates/search-params" }
 
 [package.metadata.release]
 pre-release-replacements = [
