@@ -145,13 +145,13 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             if self.abort() { return (best.0, best.1.incr_mate(), NodeType::None) };
             self.nodes_searched += 1;
 
+            if eval >= bound.beta {
+                return (m, eval.incr_mate(), NodeType::Cut);
+            }
+
             if eval > best.1 || best.0 == ChessMove::default() {
                 best = (m, eval);
                 bound.alpha = bound.alpha.max(eval);
-            }
-
-            if eval >= bound.beta {
-                return (best.0, best.1.incr_mate(), NodeType::Cut);
             }
         }
 
