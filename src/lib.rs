@@ -13,7 +13,6 @@ mod debug;
 mod eval;
 pub mod game;
 mod line;
-mod move_order;
 mod node;
 mod search;
 mod see;
@@ -46,9 +45,6 @@ pub struct Engine {
 pub(crate) struct SmpThread<'a, const MAIN: bool = false> {
     engine: &'a Engine,
     index: usize,
-
-    hist_table: move_order::HistoryTable,
-    countermove: move_order::CountermoveTable,
 
     nodes_searched: usize,
 }
@@ -97,9 +93,6 @@ impl Engine {
         SmpThread {
             engine: self,
             index,
-
-            hist_table: move_order::ButterflyTable::new(),
-            countermove: move_order::CountermoveTable::new(),
 
             nodes_searched: 0,
         }
