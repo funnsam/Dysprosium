@@ -1,11 +1,12 @@
 use core::sync::atomic::Ordering;
 
-use crate::{eval::*, line::{EvalCell, PrevMove}, *};
+use crate::{eval::*, line::{EvalCell, PrevMove}, trans_table::TransTableEntry, *};
 use bound::Bound;
 use chess::{BoardStatus, ChessMove, MoveGen};
 use node::{NodeType, Pv};
 
 mod bound;
+mod move_ord;
 pub mod params;
 
 impl Engine {
@@ -101,7 +102,26 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         ply: usize,
         bound: Bound,
     ) -> Eval {
-        self._evaluate_search::<Node, false>(prev_move, game, depth, ply, bound).1
+        let (next, eval, nt) = self._evaluate_search::<Node, false>(
+            prev_move,
+            game,
+            depth,
+            ply,
+            bound,
+        );
+
+        if self.trans_table.get_place(game.board().get_hash())
+            .is_none_or(|e| e.depth <= depth as u8)
+        {
+            self.trans_table.insert(game.board().get_hash(), TransTableEntry {
+                depth: depth as _,
+                eval,
+                next,
+                flags: TransTableEntry::new_flags(nt),
+            });
+        }
+
+        eval
     }
 
     fn _evaluate_search<Node: node::Node, const ROOT: bool>(
@@ -132,8 +152,13 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
         let mut best = (ChessMove::default(), Eval::MIN);
 
-        let moves = MoveGen::new_legal(game.board()).collect::<arrayvec::ArrayVec<_, 256>>();
-        for m in moves {
+        let tt = self.trans_table.get(game.board().get_hash());
+        let mut moves = MoveGen::new_legal(game.board())
+            .map(|m| (m, self.move_score(game, tt, m)))
+            .collect::<arrayvec::ArrayVec<_, 256>>();
+        moves.sort_unstable_by_key(|i| !i.1);
+
+        for (m, _) in moves {
             let next_game = game.make_move(m);
             let line = PrevMove {
                 mov: m,
