@@ -152,6 +152,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         }
 
         let mut best = (ChessMove::default(), Eval::MIN);
+        let mut children_searched = 0;
 
         let tt = self.trans_table.get(game.board().get_hash());
         let mut moves = MoveGen::new_legal(game.board())
@@ -167,8 +168,20 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 prev_move: Some(prev_move),
             };
 
-            let eval = -self.evaluate_search::<Pv>(&line, &next_game, depth - 1, ply + 1, -bound);
+            // principal variation search
+            let mut eval = None;
 
+            if children_searched > 0 {
+                eval = Some(-self.evaluate_search::<Node::Zw>(&line, &next_game, depth - 1, ply + 1, bound.neg_zw()));
+            }
+
+            if children_searched == 0 || (Node::PV && eval.is_some_and(|e| e > bound.alpha)) {
+                eval = Some(-self.evaluate_search::<Pv>(&line, &next_game, depth - 1, ply + 1, -bound));
+            }
+
+            let eval = eval.unwrap();
+
+            // timeout detection
             if self.abort() { return (best.0, best.1.incr_mate(), NodeType::None) };
             self.nodes_searched += 1;
 
@@ -180,6 +193,8 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 best = (m, eval);
                 bound.update_alpha(eval);
             }
+
+            children_searched += 1;
         }
 
         (best.0, best.1.incr_mate(), if best.1 != bound.alpha { NodeType::All } else { NodeType::Pv })
