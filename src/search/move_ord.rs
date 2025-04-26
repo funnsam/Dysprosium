@@ -8,9 +8,9 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             return i32::MAX;
         }
 
-        // if game.is_capture(m) {
-        //     return mvv_lva(game, m);
-        // }
+        if game.is_capture(m) {
+            return mvv_lva(game, m);
+        }
 
         0
     }
