@@ -43,4 +43,8 @@ impl Bound {
     pub fn widen_window_beta(&mut self, orig: Eval, by: i16) {
         self.beta.0 = orig.0.saturating_add(by);
     }
+
+    pub fn update_alpha(&mut self, best: Eval) {
+        self.alpha = self.alpha.max(best);
+    }
 }

@@ -8,6 +8,7 @@ use node::{NodeType, Pv};
 mod bound;
 mod move_ord;
 pub mod params;
+mod quiescence;
 
 impl Engine {
     pub fn best_move<F: FnMut(&Self, (ChessMove, Eval, usize)) -> bool>(&mut self, mut cont: F) -> (ChessMove, Eval, usize) {
@@ -147,7 +148,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         }
 
         if depth == 0 {
-            return (ChessMove::default(), evaluate_static(game.board()), NodeType::None);
+            return (ChessMove::default(), self.quiescence_search(game, bound), NodeType::None);
         }
 
         let mut best = (ChessMove::default(), Eval::MIN);
@@ -177,7 +178,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
             if eval > best.1 || best.0 == ChessMove::default() {
                 best = (m, eval);
-                bound.alpha = bound.alpha.max(eval);
+                bound.update_alpha(eval);
             }
         }
 
