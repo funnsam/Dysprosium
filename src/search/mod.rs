@@ -147,13 +147,30 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             return (ChessMove::default(), Eval(0), NodeType::None);
         }
 
+        let tt = self.trans_table.get(game.board().get_hash());
+
+        if let Some(tt) = tt {
+            let eval = tt.eval;
+            let cutoff_ok = !ROOT
+                && tt.depth >= depth as _
+                && (match tt.node_type() {
+                    NodeType::Pv => true,
+                    NodeType::All => eval < bound.alpha,
+                    NodeType::Cut => eval >= bound.beta,
+                    NodeType::None => false,
+                });
+
+            if cutoff_ok {
+                return (tt.next, eval, NodeType::None);
+            }
+        }
+
         if depth == 0 {
             return (ChessMove::default(), self.quiescence_search(game, bound), NodeType::None);
         }
 
         let mut best = (ChessMove::default(), Eval::MIN);
 
-        let tt = self.trans_table.get(game.board().get_hash());
         let mut moves = MoveGen::new_legal(game.board())
             .map(|m| (m, self.move_score(game, tt, m)))
             .collect::<arrayvec::ArrayVec<_, 256>>();
