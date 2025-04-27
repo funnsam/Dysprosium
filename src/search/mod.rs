@@ -188,12 +188,12 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             // principal variation search
             let mut eval = None;
 
-            if children_searched > 0 {
+            if !Node::PV || children_searched > 0 {
                 eval = Some(-self.evaluate_search::<Node::Zw>(&line, &next_game, depth - 1, ply + 1, bound.neg_zw()));
             }
 
-            if children_searched == 0 || (Node::PV && eval.is_some_and(|e| e > bound.alpha)) {
-                eval = Some(-self.evaluate_search::<Node::Next>(&line, &next_game, depth - 1, ply + 1, -bound));
+            if Node::PV && (children_searched == 0 || eval.is_some_and(|e| e > bound.alpha)) {
+                eval = Some(-self.evaluate_search::<Pv>(&line, &next_game, depth - 1, ply + 1, -bound));
             }
 
             let eval = eval.unwrap();

@@ -12,7 +12,6 @@ pub enum NodeType {
 }
 
 pub trait Node {
-    type Next: Node;
     type Zw: Node;
 
     const NODE: NodeType;
@@ -21,7 +20,6 @@ pub trait Node {
 
 pub struct Pv;
 impl Node for Pv {
-    type Next = Pv;
     type Zw = Cut;
 
     const NODE: NodeType = NodeType::Pv;
@@ -30,7 +28,6 @@ impl Node for Pv {
 
 pub struct Cut;
 impl Node for Cut {
-    type Next = All;
     type Zw = All;
 
     const NODE: NodeType = NodeType::Cut;
@@ -39,7 +36,6 @@ impl Node for Cut {
 
 pub struct All;
 impl Node for All {
-    type Next = Cut;
     type Zw = Cut;
 
     const NODE: NodeType = NodeType::All;

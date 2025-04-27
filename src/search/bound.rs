@@ -26,6 +26,7 @@ impl Bound {
     pub const MIN_MAX: Self = Self::new(Eval::MIN, Eval::MAX);
 
     pub const fn new(alpha: Eval, beta: Eval) -> Self {
+        debug_assert!(alpha.0 < beta.0);
         Self { alpha, beta }
     }
 
