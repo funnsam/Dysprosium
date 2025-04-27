@@ -169,6 +169,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             return (ChessMove::default(), self.quiescence_search(game, bound), NodeType::None);
         }
 
+        let mut children_searched = 0;
         let mut best_eval = Eval::MIN;
         let mut best_move = ChessMove::default();
         let mut node_type = NodeType::All;
@@ -186,8 +187,20 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 prev_move: Some(prev_move),
             };
 
-            let eval = -self.evaluate_search::<Pv>(&line, &next_game, depth - 1, ply + 1, -bound);
+            // principal variation search
+            let mut eval = None;
 
+            if !Node::PV || children_searched > 0 {
+                eval = Some(-self.evaluate_search::<Node::Zw>(&line, &next_game, depth - 1, ply + 1, bound.neg_zw()));
+            }
+
+            if Node::PV && (children_searched == 0 || eval.is_some_and(|e| e > bound.alpha)) {
+                eval = Some(-self.evaluate_search::<Pv>(&line, &next_game, depth - 1, ply + 1, -bound));
+            }
+
+            let eval = eval.unwrap();
+
+            // timeout detection
             if self.abort() {
                 return (best_move, best_eval.incr_mate(), NodeType::None);
             }
@@ -212,6 +225,8 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                     node_type = NodeType::Pv;
                 }
             }
+
+            children_searched += 1;
         }
 
         (best_move, best_eval.incr_mate(), node_type)

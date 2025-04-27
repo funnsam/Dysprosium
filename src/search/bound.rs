@@ -26,6 +26,7 @@ impl Bound {
     pub const MIN_MAX: Self = Self::new(Eval::MIN, Eval::MAX);
 
     pub const fn new(alpha: Eval, beta: Eval) -> Self {
+        debug_assert!(alpha.0 < beta.0);
         Self { alpha, beta }
     }
 
@@ -46,5 +47,9 @@ impl Bound {
 
     pub fn update_alpha(&mut self, best: Eval) {
         self.alpha = self.alpha.max(best);
+    }
+
+    pub fn neg_zw(&self) -> Self {
+        Self::new(-self.alpha - 1, -self.alpha)
     }
 }
