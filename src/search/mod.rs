@@ -189,7 +189,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             let eval = -self.evaluate_search::<Pv>(&line, &next_game, depth - 1, ply + 1, -bound);
 
             if self.abort() {
-                return (best_move, best_eval.incr_mate(), NodeType::None)
+                return (best_move, best_eval.incr_mate(), NodeType::None);
             }
 
             self.nodes_searched += 1;
