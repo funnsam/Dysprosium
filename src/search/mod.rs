@@ -169,7 +169,9 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             return (ChessMove::default(), self.quiescence_search(game, bound), NodeType::None);
         }
 
-        let mut best = (ChessMove::default(), Eval::MIN);
+        let mut best_eval = Eval::MIN;
+        let mut best_move = ChessMove::default();
+        let mut node_type = NodeType::All;
 
         let mut moves = MoveGen::new_legal(game.board())
             .map(|m| (m, self.move_score(game, tt, m)))
@@ -186,20 +188,32 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
             let eval = -self.evaluate_search::<Pv>(&line, &next_game, depth - 1, ply + 1, -bound);
 
-            if self.abort() { return (best.0, best.1.incr_mate(), NodeType::None) };
+            if self.abort() {
+                return (best_move, best_eval.incr_mate(), NodeType::None);
+            }
+
             self.nodes_searched += 1;
 
             if eval >= bound.beta {
+                best_eval = eval;
+                best_move = m;
+                node_type = NodeType::Cut;
+
                 self.hist_table.add_bonus(m, depth);
-                return (m, eval.incr_mate(), NodeType::Cut);
+                break;
             }
 
-            if eval > best.1 || best.0 == ChessMove::default() {
-                best = (m, eval);
-                bound.update_alpha(eval);
+            if eval > best_eval || best_move == ChessMove::default() {
+                best_eval = eval;
+                best_move = m;
+
+                if eval > bound.alpha {
+                    bound.alpha = eval;
+                    node_type = NodeType::Pv;
+                }
             }
         }
 
-        (best.0, best.1.incr_mate(), if best.1 != bound.alpha { NodeType::All } else { NodeType::Pv })
+        (best_move, best_eval.incr_mate(), node_type)
     }
 }
