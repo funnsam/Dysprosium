@@ -169,6 +169,16 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             return (ChessMove::default(), self.quiescence_search(game, bound), NodeType::None);
         }
 
+        // reverse futility pruning
+        if !Node::PV && depth == 1 {
+            let eval = *prev_move.static_eval;
+            let margin = self.sparams.rfp_margin_coeff * depth as i16;
+
+            if eval >= bound.beta + margin {
+                return (ChessMove::default(), eval, NodeType::None);
+            }
+        }
+
         let mut children_searched = 0;
         let mut best_eval = Eval::MIN;
         let mut best_move = ChessMove::default();

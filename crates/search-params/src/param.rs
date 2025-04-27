@@ -1,6 +1,12 @@
 use std::{io::{self, Write}, ops::Range};
 
 pub static PARAMS: &[Param] = &[
+    Param {
+        name: "rfp_margin_coeff",
+        typ: Type::Int,
+        default: 150.0,
+        bound: 50.0..250.0,
+    }
 ];
 
 #[derive(Debug, Clone)]
