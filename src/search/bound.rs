@@ -54,6 +54,6 @@ impl Bound {
     }
 
     pub fn neg_beta_zw(&self) -> Self {
-        Self::new(-self.beta - 1, -self.beta)
+        Self::new(-self.beta, -self.beta + 1)
     }
 }
