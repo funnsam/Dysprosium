@@ -6,7 +6,7 @@ use chess::{BoardStatus, ChessMove, MoveGen};
 use node::{NodeType, Pv};
 
 mod bound;
-mod move_ord;
+pub mod move_ord;
 pub mod params;
 mod quiescence;
 
@@ -190,6 +190,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             self.nodes_searched += 1;
 
             if eval >= bound.beta {
+                self.hist_table.add_bonus(m, depth);
                 return (m, eval.incr_mate(), NodeType::Cut);
             }
 

@@ -2,6 +2,8 @@ use chess::{ChessMove, Piece};
 
 use crate::{eval::PIECE_VALUE, trans_table::TransTableEntry, Game, SmpThread};
 
+pub mod history;
+
 impl<const MAIN: bool> SmpThread<'_, MAIN> {
     pub(super) fn move_score(&self, game: &Game, tt: Option<TransTableEntry>, m: ChessMove) -> i32 {
         if tt.is_some_and(|tt| tt.next == m) {
@@ -12,7 +14,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             return mvv_lva(game, m);
         }
 
-        0
+        self.hist_table[m]
     }
 }
 
