@@ -70,7 +70,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
     fn root_search(
         &mut self,
         depth: usize,
-    ) -> (ChessMove, Eval, NodeType) {
+    ) -> (ChessMove, Eval) {
         self.nodes_searched = 0;
 
         let game: Game = self.game.read().clone();
@@ -103,7 +103,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         ply: usize,
         bound: Bound,
     ) -> Eval {
-        let (next, eval, nt) = self._evaluate_search::<Node, false>(
+        let (next, eval) = self._evaluate_search::<Node, false>(
             prev_move,
             game,
             depth,
@@ -118,7 +118,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 depth: depth as _,
                 eval,
                 next,
-                flags: TransTableEntry::new_flags(nt),
+                flags: TransTableEntry::new_flags(bound.node_type(eval)),
             });
         }
 
@@ -131,20 +131,22 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         game: &Game,
         depth: usize,
         ply: usize,
-        mut bound: Bound,
-    ) -> (ChessMove, Eval, NodeType) {
+        orig_bound: Bound,
+    ) -> (ChessMove, Eval) {
+        let mut bound = orig_bound;
+
         if game.can_declare_draw() {
-            return (ChessMove::default(), Eval(0), NodeType::None);
+            return (ChessMove::default(), Eval(0));
         }
 
         match game.board().status() {
             BoardStatus::Ongoing => {},
-            BoardStatus::Checkmate => return (ChessMove::default(), -Eval::M0, NodeType::None),
-            BoardStatus::Stalemate => return (ChessMove::default(), Eval(0), NodeType::None),
+            BoardStatus::Checkmate => return (ChessMove::default(), -Eval::M0),
+            BoardStatus::Stalemate => return (ChessMove::default(), Eval(0)),
         }
 
         if self.abort() {
-            return (ChessMove::default(), Eval(0), NodeType::None);
+            return (ChessMove::default(), Eval(0));
         }
 
         let tt = self.trans_table.get(game.board().get_hash());
@@ -161,12 +163,12 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 });
 
             if cutoff_ok {
-                return (tt.next, eval, NodeType::None);
+                return (tt.next, eval);
             }
         }
 
         if depth == 0 {
-            return (ChessMove::default(), self.quiescence_search(game, bound), NodeType::None);
+            return (ChessMove::default(), self.quiescence_search(game, bound));
         }
 
         let mut best = (ChessMove::default(), Eval::MIN);
@@ -186,12 +188,12 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
             let eval = -self.evaluate_search::<Pv>(&line, &next_game, depth - 1, ply + 1, -bound);
 
-            if self.abort() { return (best.0, best.1.incr_mate(), NodeType::None) };
+            if self.abort() { return (best.0, best.1.incr_mate()) };
             self.nodes_searched += 1;
 
             if eval >= bound.beta {
                 self.hist_table.add_bonus(m, depth);
-                return (m, eval.incr_mate(), NodeType::Cut);
+                return (m, eval.incr_mate());
             }
 
             if eval > best.1 || best.0 == ChessMove::default() {
@@ -200,6 +202,6 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             }
         }
 
-        (best.0, best.1.incr_mate(), if bound.within(best.1) { NodeType::Pv } else { NodeType::All })
+        (best.0, best.1.incr_mate())
     }
 }

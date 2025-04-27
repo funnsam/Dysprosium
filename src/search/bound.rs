@@ -1,6 +1,6 @@
 use std::ops::{Neg, RangeInclusive};
 
-use crate::Eval;
+use crate::{node::NodeType, Eval};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Bound {
@@ -48,7 +48,13 @@ impl Bound {
         self.alpha = self.alpha.max(best);
     }
 
-    pub const fn within(&self, eval: Eval) -> bool {
-        self.alpha.0 < eval.0 && eval.0 < self.beta.0
+    pub const fn node_type(&self, eval: Eval) -> NodeType {
+        if eval.0 <= self.alpha.0 {
+            NodeType::All
+        } else if eval.0 >= self.beta.0 {
+            NodeType::Cut
+        } else {
+            NodeType::Pv
+        }
     }
 }
