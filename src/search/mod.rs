@@ -200,6 +200,6 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             }
         }
 
-        (best.0, best.1.incr_mate(), if best.1 != bound.alpha { NodeType::All } else { NodeType::Pv })
+        (best.0, best.1.incr_mate(), if bound.within(best.1) { NodeType::Pv } else { NodeType::All })
     }
 }

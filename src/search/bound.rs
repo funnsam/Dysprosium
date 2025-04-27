@@ -47,4 +47,8 @@ impl Bound {
     pub fn update_alpha(&mut self, best: Eval) {
         self.alpha = self.alpha.max(best);
     }
+
+    pub const fn within(&self, eval: Eval) -> bool {
+        self.alpha.0 < eval.0 && eval.0 < self.beta.0
+    }
 }
