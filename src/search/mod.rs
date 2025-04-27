@@ -193,7 +193,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             }
 
             if children_searched == 0 || (Node::PV && eval.is_some_and(|e| e > bound.alpha)) {
-                eval = Some(-self.evaluate_search::<Pv>(&line, &next_game, depth - 1, ply + 1, -bound));
+                eval = Some(-self.evaluate_search::<Node::Next>(&line, &next_game, depth - 1, ply + 1, -bound));
             }
 
             let eval = eval.unwrap();
