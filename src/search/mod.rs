@@ -179,6 +179,19 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             }
         }
 
+        let in_check = game.board().checkers().0 != 0;
+
+        // null move pruning
+        if !in_check && depth > 3 {
+            let r = 3;
+            let next_game = game.make_null_move().unwrap();
+            let eval = -self.evaluate_search::<Node>(prev_move, &next_game, depth - r, ply + 1, bound.neg_beta_zw());
+
+            if eval >= bound.beta {
+                return (ChessMove::default(), eval, NodeType::None);
+            }
+        }
+
         let mut children_searched = 0;
         let mut best_eval = Eval::MIN;
         let mut best_move = ChessMove::default();
@@ -201,7 +214,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             let mut eval = None;
 
             if !Node::PV || children_searched > 0 {
-                eval = Some(-self.evaluate_search::<Node::Zw>(&line, &next_game, depth - 1, ply + 1, bound.neg_zw()));
+                eval = Some(-self.evaluate_search::<Node::Zw>(&line, &next_game, depth - 1, ply + 1, bound.neg_alpha_zw()));
             }
 
             if Node::PV && (children_searched == 0 || eval.is_some_and(|e| e > bound.alpha)) {
