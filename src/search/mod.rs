@@ -206,8 +206,11 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             if eval > best_eval || best_move == ChessMove::default() {
                 best_eval = eval;
                 best_move = m;
-                node_type = NodeType::Pv;
-                bound.update_alpha(eval);
+
+                if eval > bound.alpha {
+                    bound.alpha = eval;
+                    node_type = NodeType::Pv;
+                }
             }
         }
 
