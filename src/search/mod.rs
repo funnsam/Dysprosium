@@ -176,7 +176,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             let eval = *prev_move.static_eval;
             let margin = self.sparams.rfp_margin_coeff * depth as i16;
 
-            if eval >= bound.beta + margin {
+            if eval - margin >= bound.beta {
                 return (ChessMove::default(), eval, NodeType::None);
             }
         }
