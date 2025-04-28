@@ -172,7 +172,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         let in_check = game.board().checkers().0 != 0;
 
         // reverse futility pruning
-        if !Node::PV && !in_check && depth == 1 {
+        if !Node::PV && !in_check && depth == 1 && !bound.beta.is_positive_mate() {
             let eval = *prev_move.static_eval;
             let margin = self.sparams.rfp_margin_coeff * depth as i16;
 
