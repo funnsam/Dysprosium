@@ -49,7 +49,11 @@ impl Bound {
         self.alpha = self.alpha.max(best);
     }
 
-    pub fn neg_zw(&self) -> Self {
+    pub fn neg_alpha_zw(&self) -> Self {
         Self::new(-self.alpha - 1, -self.alpha)
+    }
+
+    pub fn neg_beta_zw(&self) -> Self {
+        Self::new(-self.beta, -self.beta + 1)
     }
 }
