@@ -181,8 +181,6 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             }
         }
 
-        let in_check = game.board().checkers().0 != 0;
-
         // null move pruning
         if !in_check && depth > 3 {
             let r = 3;
