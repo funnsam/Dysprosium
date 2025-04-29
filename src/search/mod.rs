@@ -185,7 +185,13 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         if !in_check && depth > 3 {
             let r = 3;
             let next_game = game.make_null_move().unwrap();
-            let eval = -self.evaluate_search::<Node>(prev_move, &next_game, depth - r, ply + 1, bound.neg_beta_zw());
+            let prev_move = PrevMove {
+                mov: ChessMove::default(),
+                static_eval: EvalCell::new(next_game.board()),
+                prev_move: Some(prev_move),
+            };
+
+            let eval = -self.evaluate_search::<Node>(&prev_move, &next_game, depth - r, ply + 1, bound.neg_beta_zw());
 
             if eval >= bound.beta {
                 return (ChessMove::default(), eval, NodeType::None);
