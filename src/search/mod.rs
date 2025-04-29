@@ -169,8 +169,10 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             return (ChessMove::default(), self.quiescence_search(game, bound), NodeType::None);
         }
 
+        let in_check = game.board().checkers().0 != 0;
+
         // reverse futility pruning
-        if !Node::PV && depth == 1 {
+        if !Node::PV && !in_check && depth == 1 {
             let eval = *prev_move.static_eval;
             let margin = self.sparams.rfp_margin_coeff * depth as i16;
 
