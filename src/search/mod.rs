@@ -183,7 +183,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
         // null move pruning
         if !in_check && depth > 3 {
-            let r = 3;
+            let r = 2 + depth / 3;
             let next_game = game.make_null_move().unwrap();
             let eval = -self.evaluate_search::<Node>(prev_move, &next_game, depth - r, ply + 1, bound.neg_beta_zw());
 
