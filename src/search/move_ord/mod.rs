@@ -3,15 +3,26 @@ use chess::{ChessMove, Piece};
 use crate::{eval::PIECE_VALUE, trans_table::TransTableEntry, Game, SmpThread};
 
 pub mod history;
+pub mod killer;
 
 impl<const MAIN: bool> SmpThread<'_, MAIN> {
-    pub(super) fn move_score(&self, game: &Game, tt: Option<TransTableEntry>, m: ChessMove) -> i32 {
+    pub(super) fn move_score(
+        &self,
+        game: &Game,
+        ply: usize,
+        tt: Option<TransTableEntry>,
+        m: ChessMove,
+    ) -> i32 {
         if tt.is_some_and(|tt| tt.next == m) {
             return i32::MAX;
         }
 
         if game.is_capture(m) {
             return mvv_lva(game, m);
+        }
+
+        if self.killer_table[ply].contains(m) {
+            return 10000;
         }
 
         self.hist_table[m]

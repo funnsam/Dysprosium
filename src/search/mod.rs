@@ -204,7 +204,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         let mut node_type = NodeType::All;
 
         let mut moves = MoveGen::new_legal(game.board())
-            .map(|m| (m, self.move_score(game, tt, m)))
+            .map(|m| (m, self.move_score(game, ply, tt, m)))
             .collect::<arrayvec::ArrayVec<_, 256>>();
         moves.sort_unstable_by_key(|i| !i.1);
 
@@ -242,6 +242,8 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 node_type = NodeType::Cut;
 
                 self.hist_table.add_bonus(m, depth);
+                self.killer_table[ply].push(m);
+
                 break;
             }
 

@@ -1,5 +1,5 @@
 pub use eval::{Eval, evaluate_static};
-use search::move_ord::history::HistoryTable;
+use search::move_ord::{history::HistoryTable, killer::KillerTable};
 pub use search::params::SearchParams;
 pub use game::Game;
 pub use see::see;
@@ -51,6 +51,7 @@ pub(crate) struct SmpThread<'a, const MAIN: bool = false> {
     index: usize,
 
     hist_table: HistoryTable,
+    killer_table: KillerTable,
 
     nodes_searched: usize,
 }
@@ -103,6 +104,7 @@ impl Engine {
             index,
 
             hist_table: HistoryTable::new(),
+            killer_table: KillerTable::new(),
 
             nodes_searched: 0,
         }
