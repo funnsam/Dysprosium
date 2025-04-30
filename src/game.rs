@@ -1,10 +1,11 @@
 use core::str::FromStr;
+use std::ops::Deref;
 
 #[derive(Clone)]
 pub struct Game {
     board: chess::Board,
     fifty_move_counter: usize,
-    hash_history: Vec<u64>,
+    hash_history: HashHistory,
 }
 
 impl Game {
@@ -12,7 +13,7 @@ impl Game {
         Self {
             board,
             fifty_move_counter: 0,
-            hash_history: vec![],
+            hash_history: HashHistory::new(),
         }
     }
 
@@ -37,6 +38,7 @@ impl Game {
         }
 
         let board = self.board.make_move_new(mov);
+
         let mut hash_history = self.hash_history.clone();
         hash_history.push(board.get_hash());
 
@@ -46,6 +48,7 @@ impl Game {
     pub fn make_null_move(&self) -> Option<Self> {
         let board = self.board.null_move()?;
         let fifty_move_counter = self.fifty_move_counter + 1;
+
         let mut hash_history = self.hash_history.clone();
         hash_history.push(board.get_hash());
 
@@ -53,8 +56,8 @@ impl Game {
     }
 
     pub fn can_declare_draw(&self) -> bool {
-        for h in self.hash_history.iter() {
-            if self.hash_history.iter().filter(|i| h == *i).count() >= 3 {
+        if let Some(last) = self.hash_history.last() {
+            if self.hash_history.iter().filter(|i| last == **i).count() >= 3 {
                 return true;
             }
         }
@@ -173,7 +176,7 @@ impl FromStr for Game {
         Ok(Self {
             board,
             fifty_move_counter: fmc.parse()?,
-            hash_history: (0..moves.parse::<u64>()? * 2 - (board.side_to_move() == chess::Color::White) as u64).collect(),
+            hash_history: HashHistory::unqiue(moves.parse::<usize>()? * 2 - (board.side_to_move() == chess::Color::White) as usize),
         })
     }
 }
@@ -181,5 +184,51 @@ impl FromStr for Game {
 impl Default for Game {
     fn default() -> Self {
         Self::new(chess::Board::default())
+    }
+}
+
+const HASH_HISTORY_LEN: usize = 128;
+
+#[derive(Clone)]
+pub struct HashHistory {
+    inner: [u64; HASH_HISTORY_LEN],
+    len: usize,
+}
+
+impl HashHistory {
+    pub const fn new() -> Self {
+        Self {
+            inner: [0; HASH_HISTORY_LEN],
+            len: 0,
+        }
+    }
+
+    pub fn unqiue(len: usize) -> Self {
+        Self {
+            inner: core::array::from_fn(|i| i as u64),
+            len,
+        }
+    }
+
+    pub const fn len(&self) -> usize { self.len }
+
+    pub fn push(&mut self, val: u64) {
+        self.inner[self.len % HASH_HISTORY_LEN] = val;
+        self.len += 1;
+    }
+
+    pub fn last(&self) -> Option<u64> {
+        if self.len() == 0 { return None };
+
+        let i = (self.len - 1) % HASH_HISTORY_LEN;
+        Some(self.inner[i])
+    }
+}
+
+impl Deref for HashHistory {
+    type Target = [u64];
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner[..self.len().min(HASH_HISTORY_LEN)]
     }
 }
