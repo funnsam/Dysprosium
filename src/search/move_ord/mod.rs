@@ -1,4 +1,4 @@
-use chess::{ChessMove, Piece};
+use chess::ChessMove;
 
 use crate::{eval::PIECE_VALUE, trans_table::TransTableEntry, Game, SmpThread};
 
@@ -11,7 +11,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         }
 
         if game.is_capture(m) {
-            return mvv_lva(game, m);
+            return mvv_lva(game, m) * 1000;
         }
 
         self.hist_table[m]
@@ -22,8 +22,7 @@ fn mvv_lva(game: &Game, m: ChessMove) -> i32 {
     let victim = game.board().piece_on(m.get_dest()).unwrap();
     let aggressor = game.board().piece_on(m.get_source()).unwrap();
 
-    PIECE_VALUE[victim.to_index()] as i32 * PIECE_VALUE[Piece::Queen.to_index()] as i32
-        - PIECE_VALUE[aggressor.to_index()] as i32
+    PIECE_VALUE[victim.to_index()] as i32 - PIECE_VALUE[aggressor.to_index()] as i32
 }
 
 #[test]
