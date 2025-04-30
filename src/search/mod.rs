@@ -219,7 +219,20 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             // principal variation search
             let mut eval = None;
 
-            if !Node::PV || children_searched > 0 {
+            let can_reduce = !Node::PV
+                && children_searched > 0
+                && depth > 2
+                && !in_check;
+            let full_depth = if can_reduce {
+                let r = 2;
+
+                let _eval = -self.evaluate_search::<Node::Zw>(&line, &next_game, depth - r, ply + 1, bound.neg_alpha_zw());
+                eval = Some(_eval);
+
+                _eval > bound.alpha && r > 1
+            } else { false };
+
+            if !Node::PV || children_searched > 0 || full_depth {
                 eval = Some(-self.evaluate_search::<Node::Zw>(&line, &next_game, depth - 1, ply + 1, bound.neg_alpha_zw()));
             }
 
