@@ -6,6 +6,8 @@ use super::bound::Bound;
 
 impl<const MAIN: bool> SmpThread<'_, MAIN> {
     pub(super) fn quiescence_search(&mut self, game: &Game, mut bound: Bound) -> Eval {
+        self.nodes_searched += 1;
+
         let mut best = evaluate_static(game.board());
 
         if best >= bound.beta { return best };
@@ -17,7 +19,6 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         for m in moves {
             let next_game = game.make_move(m);
             let eval = -self.quiescence_search(&next_game, -bound);
-            self.nodes_searched += 1;
 
             if eval >= bound.beta { return eval };
             if eval > best {

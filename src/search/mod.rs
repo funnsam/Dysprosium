@@ -133,6 +133,8 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         ply: usize,
         mut bound: Bound,
     ) -> (ChessMove, Eval, NodeType) {
+        self.nodes_searched += 1;
+
         if game.can_declare_draw() {
             return (ChessMove::default(), Eval(0), NodeType::None);
         }
@@ -233,8 +235,6 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             if self.abort() {
                 return (best_move, best_eval.incr_mate(), NodeType::None);
             }
-
-            self.nodes_searched += 1;
 
             if eval >= bound.beta {
                 best_eval = eval;
