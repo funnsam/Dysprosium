@@ -105,7 +105,7 @@ dependencies = [
 
 [[package]]
 name = "dysprosium"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "arrayvec",
  "bytemuck",
@@ -117,7 +117,7 @@ dependencies = [
 
 [[package]]
 name = "dysprosium-lichess"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "chess",
  "dysprosium",
@@ -130,7 +130,7 @@ dependencies = [
 
 [[package]]
 name = "dysprosium-uci"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "chess",
  "dysprosium",
