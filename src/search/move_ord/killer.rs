@@ -6,10 +6,7 @@ use chess::{ChessMove, Square};
 pub struct KillerTable([KillerEntry; 256]);
 
 #[derive(Clone, Copy)]
-pub struct KillerEntry {
-    inner: [ChessMove; 2],
-    len: usize,
-}
+pub struct KillerEntry(ChessMove);
 
 impl KillerTable {
     pub const fn new() -> Self {
@@ -33,19 +30,14 @@ impl IndexMut<usize> for KillerTable {
 
 impl KillerEntry {
     pub const fn new() -> Self {
-        Self {
-            inner: [ChessMove::new(Square::A1, Square::A1, None); 2],
-            len: 0,
-        }
+        Self(ChessMove::new(Square::A1, Square::A1, None))
     }
 
     pub fn contains(&self, mov: ChessMove) -> bool {
-        self.inner[..self.len.min(2)].iter().any(|i| *i == mov)
+        self.0 == mov
     }
 
     pub fn push(&mut self, mov: ChessMove) {
-        if self.contains(mov) { return };
-        self.inner[self.len % 2] = mov;
-        self.len += 1;
+        self.0 = mov;
     }
 }
