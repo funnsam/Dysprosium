@@ -18,11 +18,11 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         }
 
         if game.is_capture(m) {
-            return mvv_lva(game, m);
+            return mvv_lva(game, m) * 1000;
         }
 
         if self.killer_table[ply].contains(m) {
-            return 10000;
+            return 1000000;
         }
 
         self.hist_table[m]
