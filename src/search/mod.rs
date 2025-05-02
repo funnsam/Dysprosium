@@ -226,7 +226,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 && depth > 2
                 && !in_check;
             let full_depth = if can_reduce {
-                let r = 2;
+                let r = 1 + depth / 2;
 
                 let _eval = -self.evaluate_search::<Node::Zw>(&line, &next_game, depth - r, ply + 1, bound.neg_alpha_zw());
                 eval = Some(_eval);
