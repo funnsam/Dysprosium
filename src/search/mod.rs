@@ -222,9 +222,9 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             let mut eval = None;
 
             let can_reduce = !Node::PV
-                && children_searched > 0
-                && depth > 2
-                && !in_check;
+                && !in_check
+                && children_searched > 1
+                && depth > 2;
             let full_depth = if can_reduce {
                 let r = 1 + depth / 2;
 
