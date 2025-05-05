@@ -230,6 +230,8 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                 return (best_move, best_eval.incr_mate(), NodeType::None);
             }
 
+            children_searched += 1;
+
             if eval >= bound.beta {
                 best_eval = eval;
                 best_move = m;
@@ -248,15 +250,15 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
                     node_type = NodeType::Pv;
                 }
             }
-
-            children_searched += 1;
         }
 
         if children_searched == 0 {
             best_eval = if in_check { -Eval::M0 } else { Eval(0) };
             node_type = NodeType::None;
+        } else {
+            best_eval = best_eval.incr_mate();
         }
 
-        (best_move, best_eval.incr_mate(), node_type)
+        (best_move, best_eval, node_type)
     }
 }
