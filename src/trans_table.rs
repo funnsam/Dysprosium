@@ -2,12 +2,11 @@ use crate::{eval::Eval, node::NodeType, shared_table::*};
 
 pub type TransTable = SharedHashTable<TransTableEntry>;
 
-#[repr(packed)]
 #[derive(Default, Clone, Copy)]
 pub struct TransTableEntry {
-    pub depth: u8,
     pub eval: Eval,
     pub next: chess::ChessMove,
+    pub depth: u8,
     /// 2-bit node type
     pub flags: u8,
 }

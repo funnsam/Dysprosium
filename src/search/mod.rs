@@ -115,9 +115,9 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             .is_none_or(|e| e.depth <= depth as u8)
         {
             self.trans_table.insert(game.board().get_hash(), TransTableEntry {
-                depth: depth as _,
                 eval,
                 next,
+                depth: depth as _,
                 flags: TransTableEntry::new_flags(nt),
             });
         }

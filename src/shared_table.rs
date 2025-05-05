@@ -6,7 +6,6 @@ pub struct SharedHashTable<T: Clone + Copy + Sized + Send + Sync + NoUninit> {
     inner: Box<[Cell<TableEntry<T>>]>,
 }
 
-#[repr(packed)]
 #[derive(Default, Clone, Copy)]
 pub struct TableEntry<T: Clone + Copy + Sized + Send + Sync + NoUninit> {
     key: u64,
