@@ -139,12 +139,6 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             return (ChessMove::default(), Eval(0), NodeType::None);
         }
 
-        match game.board().status() {
-            BoardStatus::Ongoing => {},
-            BoardStatus::Checkmate => return (ChessMove::default(), -Eval::M0, NodeType::None),
-            BoardStatus::Stalemate => return (ChessMove::default(), Eval(0), NodeType::None),
-        }
-
         if self.abort() {
             return (ChessMove::default(), Eval(0), NodeType::None);
         }
@@ -256,6 +250,11 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             }
 
             children_searched += 1;
+        }
+
+        if children_searched == 0 {
+            best_eval = if in_check { -Eval::M0 } else { Eval(0) };
+            node_type = NodeType::None;
         }
 
         (best_move, best_eval.incr_mate(), node_type)
