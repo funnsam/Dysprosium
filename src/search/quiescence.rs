@@ -1,5 +1,3 @@
-use chess::MoveGen;
-
 use crate::{evaluate_static, Eval, Game, SmpThread};
 
 use super::bound::Bound;
@@ -13,11 +11,12 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         if best >= bound.beta { return best };
         bound.update_alpha(best);
 
-        let mut moves = MoveGen::new_legal(game.board());
-        moves.set_iterator_mask(*game.board().combined());
+        let mut moves = game.board().pseudo_legal_captures(&[]);
 
         for m in moves {
             let next_game = game.make_move(m);
+            if next_game.board().is_illegal() { continue };
+
             let eval = -self.quiescence_search(&next_game, -bound);
 
             if eval >= bound.beta { return eval };

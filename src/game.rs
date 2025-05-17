@@ -1,15 +1,17 @@
 use core::str::FromStr;
 use std::ops::Deref;
 
+use dychess::{board::{Board, NullMoveRestorer}, color::Color, prelude::{Bitboard, Move}, square::{File, Rank, Square}};
+
 #[derive(Clone)]
 pub struct Game {
-    board: chess::Board,
+    board: Board,
     fifty_move_counter: usize,
     hash_history: HashHistory,
 }
 
 impl Game {
-    pub fn new(board: chess::Board) -> Self {
+    pub fn new(board: Board) -> Self {
         Self {
             board,
             fifty_move_counter: 0,
@@ -17,27 +19,28 @@ impl Game {
         }
     }
 
-    pub fn board(&self) -> &chess::Board { &self.board }
+    pub fn board(&self) -> &Board { &self.board }
 
-    pub fn is_capture(&self, mov: chess::ChessMove) -> bool {
-        self.board().piece_on(mov.get_dest()).is_some()
+    pub fn is_capture(&self, mov: Move) -> bool {
+        self.board().piece_on(mov.to()).is_some()
     }
 
-    pub fn is_quiet(&self, mov: chess::ChessMove) -> bool {
-        mov.get_promotion().is_none() && !self.is_capture(mov)
+    pub fn is_quiet(&self, mov: Move) -> bool {
+        mov.promotion().is_none() && !self.is_capture(mov)
     }
 
-    pub fn make_move(&self, mov: chess::ChessMove) -> Self {
+    pub fn make_move(&self, mov: Move) -> Self {
         let mut fifty_move_counter = self.fifty_move_counter + 1;
 
-        let is_pawn = (self.board.pieces(chess::Piece::Pawn) & chess::BitBoard::from_square(mov.get_source())).0 != 0;
-        let is_capture = (self.board.combined() & chess::BitBoard::from_square(mov.get_dest())).0 != 0;
+        let is_pawn = (self.board.pawns() & mov.from().into()).0 != 0;
+        let is_capture = (self.board.combined() & mov.to().into()).0 != 0;
 
         if is_pawn || is_capture {
             fifty_move_counter = 0;
         }
 
-        let board = self.board.make_move_new(mov);
+        let mut board = self.board;
+        board.make_move(mov);
 
         let mut hash_history = self.hash_history.clone();
         hash_history.push(board.get_hash());
@@ -45,14 +48,18 @@ impl Game {
         Self { board, fifty_move_counter, hash_history }
     }
 
-    pub fn make_null_move(&self) -> Option<Self> {
-        let board = self.board.null_move()?;
-        let fifty_move_counter = self.fifty_move_counter + 1;
+    pub fn make_null_move(&mut self) -> NullMoveRestorer {
+        let restorer = self.board.null_move();
+        self.fifty_move_counter += 1;
+        self.hash_history.push(self.board.get_hash());
 
-        let mut hash_history = self.hash_history.clone();
-        hash_history.push(board.get_hash());
+        restorer
+    }
 
-        Some(Self { board, fifty_move_counter, hash_history })
+    pub fn unmake_null_move(&mut self, restorer: NullMoveRestorer) {
+        self.board.restore_null_move(restorer);
+        self.fifty_move_counter -= 1;
+        self.hash_history.delete_last();
     }
 
     pub fn can_declare_draw(&self) -> bool {
@@ -76,35 +83,35 @@ impl Game {
         )
     }
 
-    pub fn visualize(&self, bitboard: chess::BitBoard) {
-        for rank in chess::ALL_RANKS.iter().rev() {
+    pub fn visualize(&self, bitboard: Bitboard) {
+        for rank in Rank::ALL.iter().rev() {
             let get = |file| {
-                let sq = chess::Square::make_square(*rank, file);
-                let bg = if (chess::BitBoard::from_square(sq) & bitboard).0 != 0 { 1 } else { 232 };
+                let sq = Square::new(file, *rank);
+                let bg = if (bitboard & sq.into()).0 != 0 { 1 } else { 232 };
 
                 self.board().piece_on(sq).map_or_else(
                     || format!("\x1b[48;5;{bg}m \x1b[0m"),
                     |p| {
                         let c = self.board().color_on(sq).unwrap();
 
-                        format!("\x1b[1;38;5;{};48;5;{bg}m{}\x1b[0m", 255 - c.to_index() * 8, p.to_string(c))
+                        format!("\x1b[1;38;5;{};48;5;{bg}m{}\x1b[0m", 255 - c as usize * 8, p.to_char(c))
                     }
                 )
             };
 
-            let pa = get(chess::File::A);
-            let pb = get(chess::File::B);
-            let pc = get(chess::File::C);
-            let pd = get(chess::File::D);
-            let pe = get(chess::File::E);
-            let pf = get(chess::File::F);
-            let pg = get(chess::File::G);
-            let ph = get(chess::File::H);
+            let pa = get(File::A);
+            let pb = get(File::B);
+            let pc = get(File::C);
+            let pd = get(File::D);
+            let pe = get(File::E);
+            let pf = get(File::F);
+            let pg = get(File::G);
+            let ph = get(File::H);
 
-            if *rank == chess::Rank::Eighth {
-                println!("┌───┬───┬───┬───┬───┬───┬───┬──{}┐", ['₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈'][rank.to_index()]);
+            if *rank == Rank::_8 {
+                println!("┌───┬───┬───┬───┬───┬───┬───┬──{}┐", ['₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈'][*rank as usize]);
             } else {
-                println!("├───┼───┼───┼───┼───┼───┼───┼──{}┤", ['₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈'][rank.to_index()]);
+                println!("├───┼───┼───┼───┼───┼───┼───┼──{}┤", ['₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈'][*rank as usize]);
             }
             println!("│ {pa} │ {pb} │ {pc} │ {pd} │ {pe} │ {pf} │ {pg} │ {ph} │");
         }
@@ -115,10 +122,10 @@ impl Game {
 
 impl core::fmt::Display for Game {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        for rank in chess::ALL_RANKS.iter().rev() {
+        for rank in Rank::ALL.iter().rev() {
             let get = |file| {
-                let sq = chess::Square::make_square(*rank, file);
-                let bg = if (file.to_index() + rank.to_index()) & 1 == 0 { 232 } else { 234 };
+                let sq = Square::new(file, *rank);
+                let bg = if (file as u8 + *rank as u8) & 1 == 0 { 232 } else { 234 };
 
                 self.board().piece_on(sq).map_or_else(
                     || if f.alternate() { format!("\x1b[48;5;{bg}m \x1b[0m") } else { " ".to_string() },
@@ -126,27 +133,27 @@ impl core::fmt::Display for Game {
                         let c = self.board().color_on(sq).unwrap();
 
                         if f.alternate() {
-                            format!("\x1b[1;38;5;{};48;5;{bg}m{}\x1b[0m", 255 - c.to_index() * 8, p.to_string(c))
+                            format!("\x1b[1;38;5;{};48;5;{bg}m{}\x1b[0m", 255 - c as usize * 8, p.to_char(c))
                         } else {
-                            p.to_string(c)
+                            p.to_char(c).into()
                         }
                     }
                 )
             };
 
-            let pa = get(chess::File::A);
-            let pb = get(chess::File::B);
-            let pc = get(chess::File::C);
-            let pd = get(chess::File::D);
-            let pe = get(chess::File::E);
-            let pf = get(chess::File::F);
-            let pg = get(chess::File::G);
-            let ph = get(chess::File::H);
+            let pa = get(File::A);
+            let pb = get(File::B);
+            let pc = get(File::C);
+            let pd = get(File::D);
+            let pe = get(File::E);
+            let pf = get(File::F);
+            let pg = get(File::G);
+            let ph = get(File::H);
 
-            if *rank == chess::Rank::Eighth {
-                writeln!(f, "┌───┬───┬───┬───┬───┬───┬───┬──{}┐", ['₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈'][rank.to_index()])?;
+            if *rank == Rank::_8 {
+                writeln!(f, "┌───┬───┬───┬───┬───┬───┬───┬──{}┐", ['₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈'][*rank as usize])?;
             } else {
-                writeln!(f, "├───┼───┼───┼───┼───┼───┼───┼──{}┤", ['₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈'][rank.to_index()])?;
+                writeln!(f, "├───┼───┼───┼───┼───┼───┼───┼──{}┤", ['₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈'][*rank as usize])?;
             }
             writeln!(f, "│ {pa} │ {pb} │ {pc} │ {pd} │ {pe} │ {pf} │ {pg} │ {ph} │")?;
         }
@@ -171,19 +178,19 @@ impl FromStr for Game {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (rest, moves) = s.rsplit_once(' ').ok_or("")?;
         let (_, fmc) = rest.rsplit_once(' ').ok_or("")?;
-        let board = chess::Board::from_str(s).map_err(|_| "")?;
+        let board = Board::from_epd(false, s).map_err(|_| "")?;
 
         Ok(Self {
             board,
             fifty_move_counter: fmc.parse()?,
-            hash_history: HashHistory::unqiue(moves.parse::<usize>()? * 2 - (board.side_to_move() == chess::Color::White) as usize),
+            hash_history: HashHistory::unqiue(moves.parse::<usize>()? * 2 - (board.side_to_move() == Color::White) as usize),
         })
     }
 }
 
 impl Default for Game {
     fn default() -> Self {
-        Self::new(chess::Board::default())
+        Self::new(Board::default())
     }
 }
 
@@ -215,6 +222,10 @@ impl HashHistory {
     pub fn push(&mut self, val: u64) {
         self.inner[self.len % HASH_HISTORY_LEN] = val;
         self.len += 1;
+    }
+
+    pub fn delete_last(&mut self) {
+        self.len -= 1;
     }
 
     pub fn last(&self) -> Option<u64> {

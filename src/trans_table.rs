@@ -1,3 +1,5 @@
+use dychess::prelude::Move;
+
 use crate::{eval::Eval, node::NodeType, shared_table::*};
 
 pub type TransTable = SharedHashTable<TransTableEntry>;
@@ -7,7 +9,7 @@ pub type TransTable = SharedHashTable<TransTableEntry>;
 pub struct TransTableEntry {
     pub depth: u8,
     pub eval: Eval,
-    pub next: chess::ChessMove,
+    pub next: Option<Move>,
     /// 2-bit node type
     pub flags: u8,
 }

@@ -18,6 +18,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
     }
 }
 
+#[inline]
 fn mvv_lva(game: &Game, m: ChessMove) -> i32 {
     let victim = game.board().piece_on(m.get_dest()).unwrap();
     let aggressor = game.board().piece_on(m.get_source()).unwrap();

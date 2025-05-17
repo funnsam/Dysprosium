@@ -104,12 +104,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "dychess"
+version = "0.1.0"
+source = "git+https://github.com/funnsam/dychess.git#e425442487796b624933455fe527e5e2be48bfa8"
+dependencies = [
+ "fastrand",
+]
+
+[[package]]
 name = "dysprosium"
 version = "0.2.0"
 dependencies = [
  "arrayvec",
  "bytemuck",
- "chess",
+ "dychess",
  "fastrand",
  "fxhash",
  "parking_lot",

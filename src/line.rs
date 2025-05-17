@@ -1,12 +1,12 @@
 use core::{cell::OnceCell, ops::Deref};
 
-use chess::{Board, ChessMove};
+use dychess::{board::Board, prelude::Move};
 
 use crate::{evaluate_static, Eval};
 
 #[derive(Debug, Clone)]
 pub struct PrevMove<'a> {
-    pub mov: ChessMove,
+    pub mov: Option<Move>,
     pub static_eval: EvalCell<'a>,
     pub prev_move: Option<&'a Self>,
 }

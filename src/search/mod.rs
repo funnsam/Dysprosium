@@ -2,7 +2,7 @@ use core::sync::atomic::Ordering;
 
 use crate::{eval::*, line::{EvalCell, PrevMove}, trans_table::TransTableEntry, *};
 use bound::Bound;
-use chess::{BoardStatus, ChessMove, MoveGen};
+use dychess::prelude::Move;
 use node::{NodeType, Pv};
 
 mod bound;
@@ -11,7 +11,7 @@ pub mod params;
 mod quiescence;
 
 impl Engine {
-    pub fn best_move<F: FnMut(&Self, (ChessMove, Eval, usize)) -> bool>(&mut self, mut cont: F) -> (ChessMove, Eval, usize) {
+    pub fn best_move<F: FnMut(&Self, (Move, Eval, usize)) -> bool>(&mut self, mut cont: F) -> (Move, Eval, usize) {
         self.time_ref = Instant::now();
         self.total_nodes_searched.store(0, Ordering::Relaxed);
         self.debug.clear();
@@ -70,20 +70,20 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
     fn root_search(
         &mut self,
         depth: usize,
-    ) -> (ChessMove, Eval, NodeType) {
+    ) -> (Move, Eval, NodeType) {
         self.nodes_searched = 0;
 
         let game: Game = self.game.read().clone();
         let line = PrevMove {
-            mov: ChessMove::default(),
+            mov: None,
             static_eval: EvalCell::new(game.board()),
             prev_move: None,
         };
 
-        let ret = self._evaluate_search::<Pv, true>(&line, &game, depth, 0, Bound::MIN_MAX);
+        let (m, e, nt) = self._evaluate_search::<Pv, true>(&line, &game, depth, 0, Bound::MIN_MAX);
         self.total_nodes_searched.fetch_add(self.nodes_searched, Ordering::Relaxed);
 
-        ret
+        (m.unwrap(), e, nt)
     }
 
     fn abort(&self) -> bool {
@@ -132,15 +132,15 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         depth: usize,
         ply: usize,
         mut bound: Bound,
-    ) -> (ChessMove, Eval, NodeType) {
+    ) -> (Option<Move>, Eval, NodeType) {
         self.nodes_searched += 1;
 
         if game.can_declare_draw() {
-            return (ChessMove::default(), Eval(0), NodeType::None);
+            return (None, Eval(0), NodeType::None);
         }
 
         if self.abort() {
-            return (ChessMove::default(), Eval(0), NodeType::None);
+            return (None, Eval(0), NodeType::None);
         }
 
         let tt = self.trans_table.get(game.board().get_hash());
@@ -162,10 +162,10 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         }
 
         if depth == 0 {
-            return (ChessMove::default(), self.quiescence_search(game, bound), NodeType::None);
+            return (None, self.quiescence_search(game, bound), NodeType::None);
         }
 
-        let in_check = game.board().checkers().0 != 0;
+        let in_check = game.board().is_check();
 
         // reverse futility pruning
         if !Node::PV && !in_check && depth == 1 {
@@ -173,7 +173,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             let margin = self.sparams.rfp_margin_coeff * depth as i16;
 
             if eval >= bound.beta + margin {
-                return (ChessMove::default(), eval, NodeType::None);
+                return (None, eval, NodeType::None);
             }
         }
 
@@ -182,7 +182,7 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             let r = 3;
             let next_game = game.make_null_move().unwrap();
             let prev_move = PrevMove {
-                mov: ChessMove::default(),
+                mov: None,
                 static_eval: EvalCell::new(next_game.board()),
                 prev_move: Some(prev_move),
             };
@@ -190,16 +190,16 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
             let eval = -self.evaluate_search::<Node>(&prev_move, &next_game, depth - r, ply + 1, bound.neg_beta_zw());
 
             if eval >= bound.beta {
-                return (ChessMove::default(), eval, NodeType::None);
+                return (None, eval, NodeType::None);
             }
         }
 
         let mut children_searched = 0;
         let mut best_eval = Eval::MIN;
-        let mut best_move = ChessMove::default();
+        let mut best_move = None;
         let mut node_type = NodeType::All;
 
-        let mut moves = MoveGen::new_legal(game.board())
+        let mut moves = game.board().pseudo_legal_moves(&[])
             .map(|m| (m, self.move_score(game, tt, m)))
             .collect::<arrayvec::ArrayVec<_, 256>>();
         moves.sort_unstable_by_key(|i| !i.1);
@@ -207,10 +207,12 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
         for (m, _) in moves {
             let next_game = game.make_move(m);
             let line = PrevMove {
-                mov: m,
+                mov: Some(m),
                 static_eval: EvalCell::new(next_game.board()),
                 prev_move: Some(prev_move),
             };
+
+            if next_game.board().is_illegal() { continue }
 
             // principal variation search
             let mut eval = None;
@@ -234,16 +236,16 @@ impl<const MAIN: bool> SmpThread<'_, MAIN> {
 
             if eval >= bound.beta {
                 best_eval = eval;
-                best_move = m;
+                best_move = Some(m);
                 node_type = NodeType::Cut;
 
                 self.hist_table.add_bonus(m, depth);
                 break;
             }
 
-            if eval > best_eval || best_move == ChessMove::default() {
+            if eval > best_eval || best_move.is_none() {
                 best_eval = eval;
-                best_move = m;
+                best_move = Some(m);
 
                 if eval > bound.alpha {
                     bound.alpha = eval;
